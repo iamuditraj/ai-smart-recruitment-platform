@@ -91,8 +91,20 @@
 
                 <!-- ---- Step 1: Summary ---- -->
                 <div v-else-if="currentStep === 1" class="form-step">
-                  <h2 class="step-title">Professional Summary</h2>
-                  <p class="step-desc">A 2–4 sentence overview of your experience and value proposition.</p>
+                  <div class="step-header-row">
+                    <div>
+                      <h2 class="step-title">Professional Summary</h2>
+                      <p class="step-desc">A 2–4 sentence overview of your experience and value proposition.</p>
+                    </div>
+                    <button 
+                      class="btn btn-outline btn-sm rg-ai-btn" 
+                      :disabled="store.isGenerating"
+                      @click="generateAISummary"
+                    >
+                      <span v-if="!store.isGenerating">✨ AI Generate</span>
+                      <span v-else class="loader-sm"></span>
+                    </button>
+                  </div>
                   <div class="form-group">
                     <label class="form-label" for="rg-summary">Summary</label>
                     <textarea
@@ -160,7 +172,17 @@
                       </div>
                     </div>
                     <div class="form-group" style="margin-top: var(--sp-3)">
-                      <label class="form-label">Description / Achievements</label>
+                      <div class="flex items-center justify-between" style="margin-bottom: 4px;">
+                        <label class="form-label">Description / Achievements</label>
+                        <button 
+                          class="btn-ghost rg-ai-btn-inline" 
+                          :disabled="store.isGenerating"
+                          @click="generateAIExperience(i)"
+                        >
+                          <span v-if="!store.isGenerating">✨ Improve with AI</span>
+                          <span v-else class="loader-sm"></span>
+                        </button>
+                      </div>
                       <textarea class="form-input" v-model="exp.description" rows="4"
                         :id="`rg-exp-desc-${i}`"
                         placeholder="• Led a team of 4 engineers to build an NLP-based resume parser reducing screening time by 60%&#10;• Deployed models serving 10K+ requests/day on AWS SageMaker...">
@@ -359,8 +381,14 @@
                     :validation="store.validationResult"
                     :breakdown="store.completenessBreakdown"
                     :score="store.completenessScore"
+                    :is-submitting="store.isSaving"
                     @print="printResume"
+                    @save="handleSubmit"
                   />
+                  
+                  <div v-if="submitStatus" class="rg-status-toast" :class="submitStatus.type">
+                    {{ submitStatus.message }}
+                  </div>
                 </div>
 
               </div>
@@ -515,9 +543,86 @@ function confirmReset() {
     currentStep.value = 0
   }
 }
+
+// AI Generation Handlers
+async function generateAISummary() {
+  const prompt = `Write a professional 3-sentence resume summary for a ${store.formData.personal.jobTitle}. 
+                  Key skills: ${store.formData.skills.technical.join(', ')}. 
+                  Focus on high-impact results.`
+  const content = await store.generateAIContent(prompt)
+  if (content) store.formData.summary = content.trim()
+}
+
+async function generateAIExperience(index) {
+  const exp = store.formData.experience[index]
+  const prompt = `Rewrite this job description to be more professional and impact-driven. 
+                  Role: ${exp.title} at ${exp.company}. 
+                  Current content: ${exp.description || 'N/A'}. 
+                  Use strong action verbs and metrics-focused bullet points.`
+  const content = await store.generateAIContent(prompt)
+  if (content) exp.description = content.trim()
+}
+
+// Platform Submission
+const submitStatus = ref(null)
+
+async function handleSubmit() {
+  try {
+    const res = await store.saveToFirestore()
+    submitStatus.value = { type: 'success', message: 'Resume successfully saved to platform!' }
+    setTimeout(() => { submitStatus.value = null }, 5000)
+  } catch (err) {
+    submitStatus.value = { type: 'error', message: 'Failed to save resume. Please check your backend connection.' }
+  }
+}
 </script>
 
 <style scoped>
+.rg-ai-btn {
+  font-size: 0.75rem;
+  padding: 0.35rem 0.8rem;
+  border-color: var(--clr-primary-2);
+  color: var(--clr-primary-2);
+}
+.rg-ai-btn:hover {
+  background: rgba(139,92,246,0.1);
+}
+
+.rg-ai-btn-inline {
+  background: none;
+  border: none;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--clr-primary-2);
+  cursor: pointer;
+  padding: 0;
+}
+.rg-ai-btn-inline:hover { text-decoration: underline; }
+
+.loader-sm {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255,255,255,0.2);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: rotate 1s linear infinite;
+  display: inline-block;
+}
+
+@keyframes rotate { to { transform: rotate(360deg); } }
+
+.rg-status-toast {
+  margin-top: var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: center;
+  animation: fade-in 0.3s ease;
+}
+.rg-status-toast.success { background: rgba(16,185,129,0.1); color: #10b981; border: 1px solid rgba(16,185,129,0.2); }
+.rg-status-toast.error { background: rgba(239,68,68,0.1); color: #ef4444; border: 1px solid rgba(239,68,68,0.2); }
+
 /* ===== Page Layout ===== */
 .rg-page {
   min-height: 100vh;

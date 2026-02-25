@@ -147,7 +147,12 @@
     <div class="rs-export-panel" id="rs-export-panel">
       <div class="rs-export-title">Export Structured Data</div>
       <div class="rs-export-actions">
-        <button class="btn btn-primary rs-export-btn" id="rs-btn-download-json" @click="onDownloadJSON">
+        <button class="btn btn-primary rs-export-btn" id="rs-btn-save-platform" @click="$emit('save')" :disabled="isSubmitting">
+          <svg v-if="!isSubmitting" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          <span v-else class="loader-sm"></span>
+          {{ isSubmitting ? 'Saving...' : 'Submit to Platform' }}
+        </button>
+        <button class="btn btn-outline rs-export-btn" id="rs-btn-download-json" @click="onDownloadJSON">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Download JSON
         </button>
@@ -198,9 +203,10 @@ const props = defineProps({
   validation:  { type: Object, required: true },
   breakdown:   { type: Object, required: true },
   score:       { type: Number, required: true },
+  isSubmitting: { type: Boolean, default: false }
 })
 
-const emit = defineEmits(['print'])
+const emit = defineEmits(['print', 'save'])
 
 const { clipboardStatus, downloadJSON, copyToClipboard } = useResumeExport()
 const showJSON = ref(false)
@@ -578,6 +584,19 @@ const prettyJSON = computed(() =>
   white-space: pre;
   background: rgba(6,12,27,0.5);
 }
+
+/* Loader */
+.loader-sm {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255,255,255,0.2);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: rotate 1s linear infinite;
+  display: inline-block;
+}
+
+@keyframes rotate { to { transform: rotate(360deg); } }
 
 /* Collapse transition */
 .rs-collapse-enter-active, .rs-collapse-leave-active {
