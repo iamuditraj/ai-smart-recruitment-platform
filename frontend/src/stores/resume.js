@@ -1,13 +1,21 @@
+import axios from 'axios'
 import { reactive, ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { mapToStructuredResume } from '../utils/resumeMapper.js'
 import { validateStructuredResume } from '../utils/resumeValidator.js'
 
+const API_BASE = 'http://localhost:5001/api'
+
 export const useResumeStore = defineStore('resume', () => {
     // --- Selected Template ---
     const selectedTemplate = ref('classic')
 
+    // --- Loading States ---
+    const isSaving = ref(false)
+    const isGenerating = ref(false)
+
     // --- Raw Form Data (user input) ---
+    // ... existing formData definition (around line 11) ...
     const formData = reactive({
         personal: {
             fullName: '',
@@ -113,6 +121,28 @@ export const useResumeStore = defineStore('resume', () => {
             return true
         } catch {
             return false
+        }
+    }
+
+    // ─── Server Actions ────────────────────────────────────────────────────────
+    async function saveToFirestore() {
+        isSaving.value = true
+        try {
+            const snapshot = saveSnapshot()
+            const response = await axios.post(`${API_BASE}/save-resume`, snapshot)
+            return response.data
+        } finally {
+            isSaving.value = false
+        }
+    }
+
+    async function generateAIContent(prompt, context = '') {
+        isGenerating.value = true
+        try {
+            const response = await axios.post(`${API_BASE}/generate-content`, { prompt, context })
+            return response.data.content
+        } finally {
+            isGenerating.value = false
         }
     }
 
@@ -261,6 +291,10 @@ export const useResumeStore = defineStore('resume', () => {
         // Template
         selectedTemplate,
 
+        // Loading states
+        isSaving,
+        isGenerating,
+
         // Raw form data (for form binding)
         formData,
 
@@ -273,6 +307,8 @@ export const useResumeStore = defineStore('resume', () => {
         // Persistence
         saveSnapshot,
         restoreLatestSnapshot,
+        saveToFirestore,
+        generateAIContent,
 
         // CRUD actions
         addExperience, removeExperience,

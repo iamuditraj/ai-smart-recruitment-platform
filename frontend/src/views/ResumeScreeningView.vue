@@ -59,11 +59,12 @@
         <button
           class="btn btn-primary"
           id="analyze-btn"
-          :disabled="files.length === 0 || !jobDescription.trim()"
+          :disabled="files.length === 0 || !jobDescription.trim() || isAnalyzing"
           @click="analyze"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          Analyze Resumes ({{ files.length }})
+          <svg v-if="!isAnalyzing" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <span v-else class="loader-sm"></span>
+          {{ isAnalyzing ? 'Analyzing...' : `Analyze Resumes (${files.length})` }}
         </button>
       </div>
 
@@ -111,11 +112,13 @@
 
 <script setup>
 import { ref } from 'vue'
+import axios from 'axios'
 
 const isDragging = ref(false)
 const files = ref([])
 const jobDescription = ref('')
 const results = ref([])
+const isAnalyzing = ref(false)
 
 function onFileChange(e) {
   files.value = Array.from(e.target.files)
@@ -126,14 +129,33 @@ function onDrop(e) {
   files.value = Array.from(e.dataTransfer.files)
 }
 
-function analyze() {
-  // Simulated AI screening results
-  results.value = [
-    { name: 'Priya_Sharma_Resume.pdf', score: 92, status: 'Shortlist', badgeClass: 'badge-success', skills: ['Python', 'NLP', 'TensorFlow', 'BERT'], experience: '5 years — Senior ML Engineer at TechCorp' },
-    { name: 'Arjun_Mehta_Resume.pdf', score: 78, status: 'Review', badgeClass: 'badge-warning', skills: ['Python', 'Scikit-learn', 'SQL'], experience: '3 years — Data Scientist at StartupX' },
-    { name: 'Riya_Kapoor_Resume.pdf', score: 85, status: 'Shortlist', badgeClass: 'badge-success', skills: ['PyTorch', 'MLOps', 'Docker', 'AWS'], experience: '4 years — ML Engineer at DataOps Inc.' },
-    { name: 'Unknown_Candidate.docx', score: 42, status: 'Rejected', badgeClass: 'badge-danger', skills: ['Excel', 'Word'], experience: '1 year — Intern (unrelated field)' },
-  ].slice(0, files.value.length || 4)
+async function analyze() {
+  if (files.value.length === 0 || !jobDescription.value.trim()) return
+  
+  isAnalyzing.value = true
+  try {
+    const formData = new FormData()
+    files.value.forEach(file => {
+      formData.append('resumes', file)
+    })
+    formData.append('jobDescription', jobDescription.value)
+
+    const response = await axios.post('http://localhost:5001/api/analyze', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+
+    if (response.data.status === 'success') {
+      results.value = response.data.results
+      console.log('✅ Analysis complete:', response.data.message)
+    }
+  } catch (error) {
+    console.error('❌ Error calling backend:', error)
+    alert('Could not connect to the Flask backend. Please make sure it is running.')
+  } finally {
+    isAnalyzing.value = false
+  }
 }
 </script>
 
@@ -370,6 +392,19 @@ function analyze() {
 .score-ring__text {
   font-size: 0.72rem;
   color: var(--clr-text-muted);
+}
+
+.loader-sm {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 @media (max-width: 600px) {

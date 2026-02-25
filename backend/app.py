@@ -1,44 +1,32 @@
-from flask import Flask, jsonify
-from flask_cors import CORS
-import firebase_admin
-from firebase_admin import credentials, firestore
 import os
+from flask import Flask
+from flask_cors import CORS
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Import external services
+from services.firebase_service import init_firebase
+from services.ai_service import init_ai
+
+# Import blueprints
+from routes.api_routes import api_bp
 
 app = Flask(__name__)
 CORS(app)
 
 # 1. Initialize Firebase
-# Path to your service account key file
-key_path = "serviceAccountKey.json"
+init_firebase()
 
-if os.path.exists(key_path):
-    try:
-        cred = credentials.Certificate(key_path)
-        firebase_admin.initialize_app(cred)
-        db = firestore.client()
-        print("✅ Firebase Admin initialized successfully!")
-    except Exception as e:
-        print(f"❌ Error initializing Firebase: {e}")
-else:
-    print("⚠️  Warning: serviceAccountKey.json not found. Database features won't work yet.")
+# 2. Initialize Gemini AI
+init_ai()
 
-@app.route('/')
-def home():
-    return jsonify({
-        "status": "online",
-        "project": "HireAI",
-        "message": "Flask is integrated correctly!"
-    })
-
-@app.route('/api/check-db')
-def check_db():
-    try:
-        if 'db' not in globals():
-             return jsonify({"status": "error", "message": "Firebase not initialized. Did you add serviceAccountKey.json?"})
-        return jsonify({"status": "success", "message": "Connected to Firestore!"})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)})
+# Register routes
+app.register_blueprint(api_bp)
 
 if __name__ == '__main__':
-    # Use port 5001 to avoid conflicts with common services or your frontend
-    app.run(debug=True, port=5001)
+    # Use port from .env or default to 5001
+    port = int(os.getenv("PORT", 5001))
+    app.run(debug=True, port=port)
+
