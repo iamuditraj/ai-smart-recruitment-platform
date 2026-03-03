@@ -96,8 +96,8 @@
                       <h2 class="step-title">Professional Summary</h2>
                       <p class="step-desc">A 2–4 sentence overview of your experience and value proposition.</p>
                     </div>
-                    <button 
-                      class="btn btn-outline btn-sm rg-ai-btn" 
+                    <button
+                      class="btn btn-outline btn-sm rg-ai-btn"
                       :disabled="store.isGenerating"
                       @click="generateAISummary"
                     >
@@ -174,8 +174,8 @@
                     <div class="form-group" style="margin-top: var(--sp-3)">
                       <div class="flex items-center justify-between" style="margin-bottom: 4px;">
                         <label class="form-label">Description / Achievements</label>
-                        <button 
-                          class="btn-ghost rg-ai-btn-inline" 
+                        <button
+                          class="btn-ghost rg-ai-btn-inline"
                           :disabled="store.isGenerating"
                           @click="generateAIExperience(i)"
                         >
@@ -265,8 +265,7 @@
                         class="rg-tag-field"
                         v-model="techInput"
                         placeholder="e.g. Python, TensorFlow..."
-                        @keydown.enter.prevent="addTechSkill"
-                        @keydown.188.prevent="addTechSkill"
+                        @keydown="handleTechKeydown"
                       />
                     </div>
                     <p class="rg-input-hint">{{ store.formData.skills.technical.length }} skills added</p>
@@ -293,8 +292,7 @@
                         class="rg-tag-field"
                         v-model="softInput"
                         placeholder="e.g. Leadership, Communication..."
-                        @keydown.enter.prevent="addSoftSkill"
-                        @keydown.188.prevent="addSoftSkill"
+                        @keydown="handleSoftKeydown"
                       />
                     </div>
                     <p class="rg-input-hint">{{ store.formData.skills.soft.length }} skills added</p>
@@ -385,7 +383,7 @@
                     @print="printResume"
                     @save="handleSubmit"
                   />
-                  
+
                   <div v-if="submitStatus" class="rg-status-toast" :class="submitStatus.type">
                     {{ submitStatus.message }}
                   </div>
@@ -462,7 +460,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useResumeStore } from '../stores/resume.js'
 
 import ClassicTemplate from '../components/resume/ClassicTemplate.vue'
@@ -531,6 +529,20 @@ function addSoftSkill() {
   softInput.value = ''
 }
 
+function handleTechKeydown(e) {
+  if (e.key === ',' || e.key === 'Enter') {
+    e.preventDefault()
+    addTechSkill()
+  }
+}
+
+function handleSoftKeydown(e) {
+  if (e.key === ',' || e.key === 'Enter') {
+    e.preventDefault()
+    addSoftSkill()
+  }
+}
+
 // Print / PDF
 function printResume() {
   window.print()
@@ -546,8 +558,8 @@ function confirmReset() {
 
 // AI Generation Handlers
 async function generateAISummary() {
-  const prompt = `Write a professional 3-sentence resume summary for a ${store.formData.personal.jobTitle}. 
-                  Key skills: ${store.formData.skills.technical.join(', ')}. 
+  const prompt = `Write a professional 3-sentence resume summary for a ${store.formData.personal.jobTitle}.
+                  Key skills: ${store.formData.skills.technical.join(', ')}.
                   Focus on high-impact results.`
   const content = await store.generateAIContent(prompt)
   if (content) store.formData.summary = content.trim()
@@ -555,9 +567,9 @@ async function generateAISummary() {
 
 async function generateAIExperience(index) {
   const exp = store.formData.experience[index]
-  const prompt = `Rewrite this job description to be more professional and impact-driven. 
-                  Role: ${exp.title} at ${exp.company}. 
-                  Current content: ${exp.description || 'N/A'}. 
+  const prompt = `Rewrite this job description to be more professional and impact-driven.
+                  Role: ${exp.title} at ${exp.company}.
+                  Current content: ${exp.description || 'N/A'}.
                   Use strong action verbs and metrics-focused bullet points.`
   const content = await store.generateAIContent(prompt)
   if (content) exp.description = content.trim()
@@ -568,10 +580,10 @@ const submitStatus = ref(null)
 
 async function handleSubmit() {
   try {
-    const res = await store.saveToFirestore()
+    await store.saveToFirestore()
     submitStatus.value = { type: 'success', message: 'Resume successfully saved to platform!' }
     setTimeout(() => { submitStatus.value = null }, 5000)
-  } catch (err) {
+  } catch {
     submitStatus.value = { type: 'error', message: 'Failed to save resume. Please check your backend connection.' }
   }
 }

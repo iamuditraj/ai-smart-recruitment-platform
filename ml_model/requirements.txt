@@ -1,0 +1,10 @@
+pandas
+numpy
+scikit-learn
+spacy
+nltk
+gensim
+python-docx
+pypdf2
+matplotlib
+seaborn
