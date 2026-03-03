@@ -17,13 +17,21 @@
           and analyze mock interviews — all in one intelligent platform.
         </p>
         <div class="hero__actions animate-fade-in-up" style="animation-delay:0.3s">
-          <RouterLink to="/resume-screening" class="btn btn-primary" id="hero-cta-primary">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            Upload Resume
-          </RouterLink>
-          <RouterLink to="/dashboard" class="btn btn-outline" id="hero-cta-secondary">
-            View Dashboard
-          </RouterLink>
+          <template v-if="!authStore.isAuthenticated">
+            <RouterLink to="/login" class="btn btn-primary" id="hero-cta-recruiter">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              Recruiter Portal
+            </RouterLink>
+            <RouterLink to="/login" class="btn btn-outline" id="hero-cta-candidate">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              Candidate Portal
+            </RouterLink>
+          </template>
+          <template v-else>
+            <RouterLink to="/dashboard" class="btn btn-primary" id="hero-cta-dashboard">
+              Go to Dashboard
+            </RouterLink>
+          </template>
         </div>
         <!-- Stats -->
         <div class="hero__stats animate-fade-in-up" style="animation-delay:0.4s">
@@ -95,6 +103,9 @@
 </template>
 
 <script setup>
+import { useAuthStore } from '../stores/auth'
+const authStore = useAuthStore()
+
 const stats = [
   { value: '10×', label: 'Faster Screening' },
   { value: '95%', label: 'Match Accuracy' },

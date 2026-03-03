@@ -1,6 +1,6 @@
 <template>
-  <div class="dashboard section">
-    <div class="container">
+  <div class="dashboard">
+    <div class="content-area">
       <!-- Header -->
       <div class="dashboard__header animate-fade-in-up">
         <div>
@@ -121,221 +121,45 @@ const activity = [
 </script>
 
 <style scoped>
-.dashboard {
-  min-height: 100vh;
-}
+.dashboard { min-height: 100vh; }
+.dashboard__header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-4); margin-bottom: var(--sp-8); flex-wrap: wrap; }
+.dashboard__title { font-size: 2rem; font-weight: 800; letter-spacing: -0.02em; }
+.dashboard__subtitle { color: var(--clr-text-muted); margin-top: var(--sp-1); }
 
-.dashboard__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--sp-4);
-  margin-bottom: var(--sp-8);
-  flex-wrap: wrap;
-}
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--sp-4); margin-bottom: var(--sp-10); }
+.kpi-card { display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-4) var(--sp-6); }
+.kpi-card__icon { width: 44px; height: 44px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.kpi-card__body { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.kpi-card__value { font-family: var(--font-heading); font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; }
+.kpi-card__label { font-size: 0.8rem; color: var(--clr-text-muted); font-weight: 500; }
+.kpi-card__change { font-size: 0.8rem; font-weight: 600; padding: 0.2rem 0.5rem; border-radius: var(--radius-full); }
+.kpi-card__change.up   { color: #059669; background: #ecfdf5; }
+.kpi-card__change.down { color: #dc2626; background: #fef2f2; }
 
-.dashboard__title {
-  font-size: 2rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
+.subsection-title { font-size: 1.25rem; font-weight: 700; margin-bottom: var(--sp-4); color: var(--clr-text); }
 
-.dashboard__subtitle {
-  color: var(--clr-text-muted);
-  margin-top: var(--sp-1);
-}
+.pipeline-section, .activity-section { margin-bottom: var(--sp-10); }
+.pipeline-stages { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--sp-4); }
+.pipeline-stage { display: flex; flex-direction: column; gap: var(--sp-3); border: 1px solid var(--clr-border); background: var(--clr-surface); }
+.pipeline-stage__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--sp-2); padding: 0 0.5rem; }
+.pipeline-stage__name { font-weight: 700; font-size: 0.9rem; color: var(--clr-text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.pipeline-candidate { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3); background: var(--clr-surface-2); border-radius: var(--radius-md); border: 1px solid var(--clr-border); transition: transform 0.2s, box-shadow 0.2s; }
+.pipeline-candidate:hover { transform: translateY(-2px); box-shadow: var(--shadow-sm); border-color: var(--clr-primary); }
+.pipeline-candidate__avatar { width: 34px; height: 34px; border-radius: var(--radius-full); background: var(--clr-primary); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700; color: white; flex-shrink: 0; }
+.pipeline-candidate__info { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.pipeline-candidate__name { font-size: 0.85rem; font-weight: 700; color: var(--clr-text); }
+.pipeline-candidate__role { font-size: 0.75rem; color: var(--clr-text-muted); }
+.pipeline-candidate__score { font-size: 0.8rem; font-weight: 800; }
+.pipeline-candidate__score.high { color: #059669; }
+.pipeline-candidate__score.mid  { color: #d97706; }
+.pipeline-candidate__score.low  { color: #dc2626; }
 
-/* KPIs */
-.kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: var(--sp-4);
-  margin-bottom: var(--sp-10);
-}
-
-.kpi-card {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-4);
-  padding: var(--sp-4) var(--sp-6);
-}
-
-.kpi-card__icon {
-  width: 44px;
-  height: 44px;
-  border-radius: var(--radius-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.kpi-card__body {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-}
-
-.kpi-card__value {
-  font-family: var(--font-heading);
-  font-size: 1.6rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-
-.kpi-card__label {
-  font-size: 0.8rem;
-  color: var(--clr-text-muted);
-  font-weight: 500;
-}
-
-.kpi-card__change {
-  font-size: 0.8rem;
-  font-weight: 600;
-  padding: 0.2rem 0.5rem;
-  border-radius: var(--radius-full);
-}
-
-.kpi-card__change.up   { color: #6ee7b7; background: rgba(16,185,129,0.1); }
-.kpi-card__change.down { color: #fca5a5; background: rgba(239,68,68,0.1); }
-
-/* Pipeline */
-.subsection-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-  margin-bottom: var(--sp-4);
-}
-
-.pipeline-section,
-.activity-section {
-  margin-bottom: var(--sp-10);
-}
-
-.pipeline-stages {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: var(--sp-4);
-}
-
-.pipeline-stage {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
-}
-
-.pipeline-stage__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--sp-2);
-}
-
-.pipeline-stage__name {
-  font-weight: 700;
-  font-size: 0.9rem;
-}
-
-.pipeline-candidate {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  padding: var(--sp-3);
-  background: var(--clr-surface);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--clr-border);
-}
-
-.pipeline-candidate__avatar {
-  width: 34px;
-  height: 34px;
-  border-radius: var(--radius-full);
-  background: var(--gradient-brand);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: white;
-  flex-shrink: 0;
-}
-
-.pipeline-candidate__info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-}
-
-.pipeline-candidate__name {
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-
-.pipeline-candidate__role {
-  font-size: 0.75rem;
-  color: var(--clr-text-muted);
-}
-
-.pipeline-candidate__score {
-  font-size: 0.8rem;
-  font-weight: 700;
-}
-
-.pipeline-candidate__score.high { color: #6ee7b7; }
-.pipeline-candidate__score.mid  { color: #fcd34d; }
-.pipeline-candidate__score.low  { color: #fca5a5; }
-
-/* Activity */
-.activity-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  padding: 0;
-  overflow: hidden;
-}
-
-.activity-item {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-4);
-  padding: var(--sp-4) var(--sp-6);
-  border-bottom: 1px solid var(--clr-border);
-  transition: background var(--transition-fast);
-}
-
-.activity-item:last-child {
-  border-bottom: none;
-}
-
-.activity-item:hover {
-  background: rgba(255,255,255,0.02);
-}
-
-.activity-item__dot {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-full);
-  flex-shrink: 0;
-}
-
-.activity-item__body {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex: 1;
-  gap: var(--sp-4);
-  flex-wrap: wrap;
-}
-
-.activity-item__text {
-  font-size: 0.875rem;
-  color: var(--clr-text-light);
-}
-
-.activity-item__time {
-  font-size: 0.78rem;
-  color: var(--clr-text-muted);
-  white-space: nowrap;
-}
+.activity-list { display: flex; flex-direction: column; gap: 0; padding: 0; overflow: hidden; background: var(--clr-surface); }
+.activity-item { display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-4) var(--sp-6); border-bottom: 1px solid var(--clr-border); transition: background var(--transition-fast); }
+.activity-item:last-child { border-bottom: none; }
+.activity-item:hover { background: var(--clr-surface-2); }
+.activity-item__dot { width: 8px; height: 8px; border-radius: var(--radius-full); flex-shrink: 0; }
+.activity-item__body { display: flex; align-items: center; justify-content: space-between; flex: 1; gap: var(--sp-4); flex-wrap: wrap; }
+.activity-item__text { font-size: 0.875rem; color: var(--clr-text); font-weight: 500; }
+.activity-item__time { font-size: 0.78rem; color: var(--clr-text-muted); white-space: nowrap; }
 </style>
