@@ -8,7 +8,7 @@ const API_BASE = 'http://localhost:5001/api'
 
 export const useResumeStore = defineStore('resume', () => {
     // --- Selected Template ---
-    const selectedTemplate = ref('classic')
+    const selectedTemplate = ref('minimal')
 
     // --- Loading States ---
     const isSaving = ref(false)
@@ -26,6 +26,7 @@ export const useResumeStore = defineStore('resume', () => {
             linkedin: '',
             github: '',
             website: '',
+            photo: '',
         },
 
         summary: '',
@@ -162,6 +163,7 @@ export const useResumeStore = defineStore('resume', () => {
             linkedin: s.profile?.contact?.linkedin || '',
             github: s.profile?.contact?.github || '',
             website: s.profile?.contact?.website || '',
+            photo: s.profile?.contact?.photo || '',
         })
         formData.summary = s.summary || ''
 
@@ -276,6 +278,7 @@ export const useResumeStore = defineStore('resume', () => {
         Object.assign(formData.personal, {
             fullName: '', jobTitle: '', email: '', phone: '',
             location: '', linkedin: '', github: '', website: '',
+            photo: '',
         })
         formData.summary = ''
         formData.experience.splice(0)

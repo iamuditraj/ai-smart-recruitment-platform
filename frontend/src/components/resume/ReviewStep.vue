@@ -147,7 +147,7 @@
     <div class="rs-export-panel" id="rs-export-panel">
       <div class="rs-export-title">Export Structured Data</div>
       <div class="rs-export-actions">
-        <button class="btn btn-primary rs-export-btn" id="rs-btn-save-platform" @click="$emit('save')" :disabled="isSubmitting">
+        <button class="btn btn-primary rs-export-btn" id="rs-btn-save-platform" @click="onSave" :disabled="isSubmitting">
           <svg v-if="!isSubmitting" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
           <span v-else class="loader-sm"></span>
           {{ isSubmitting ? 'Saving...' : 'Submit to Platform' }}
@@ -166,7 +166,7 @@
           <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
           {{ clipboardStatus === 'copied' ? 'Copied!' : clipboardStatus === 'error' ? 'Error' : 'Copy JSON' }}
         </button>
-        <button class="btn btn-outline rs-export-btn" id="rs-btn-download-pdf" @click="$emit('print')">
+        <button class="btn btn-outline rs-export-btn" id="rs-btn-download-pdf" @click="onPrint">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
           Download PDF
         </button>
@@ -237,6 +237,8 @@ function sectionColor(score, max) {
 }
 
 // ── Export handlers ──────────────────────────────────────────────────────────
+function onSave()         { emit('save') }
+function onPrint()        { emit('print') }
 function onDownloadJSON() { downloadJSON(props.structured) }
 function onCopyJSON()     { copyToClipboard(props.structured) }
 

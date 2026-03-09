@@ -2,9 +2,14 @@
   <div class="minimal-resume" id="resume-minimal">
     <!-- Header -->
     <header class="mn-header">
-      <div>
-        <h1 class="mn-name">{{ d.personal.fullName || 'Your Name' }}</h1>
-        <p class="mn-job-title">{{ d.personal.jobTitle || 'Job Title' }}</p>
+      <div class="mn-header-main">
+        <div v-if="d.personal.photo" class="mn-photo-container">
+          <img :src="d.personal.photo" alt="Profile" class="mn-photo" @error="(e) => (e.target.style.display = 'none')" />
+        </div>
+        <div>
+          <h1 class="mn-name">{{ d.personal.fullName || 'Your Name' }}</h1>
+          <p class="mn-job-title">{{ d.personal.jobTitle || 'Job Title' }}</p>
+        </div>
       </div>
       <div class="mn-contact">
         <span v-if="d.personal.email">{{ d.personal.email }}</span>
@@ -124,12 +129,32 @@ const d = computed(() => props.data)
 .mn-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 16px;
   padding-bottom: 12px;
   border-bottom: 2px solid #111827;
   margin-bottom: 24px;
-  flex-wrap: wrap;
+}
+
+.mn-header-main {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.mn-photo-container {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid #d1d5db;
+  flex-shrink: 0;
+}
+
+.mn-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .mn-name {
