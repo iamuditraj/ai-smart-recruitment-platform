@@ -86,6 +86,20 @@
                       <label class="form-label" for="rg-website">Portfolio / Website</label>
                       <input id="rg-website" type="text" class="form-input" v-model="store.formData.personal.website" placeholder="priyasharma.dev" />
                     </div>
+                    <div class="form-group form-group--full">
+                      <label class="form-label">Profile Photo (Optional)</label>
+                      <div class="photo-upload-container">
+                        <div v-if="store.formData.personal.photo" class="photo-preview">
+                          <img :src="store.formData.personal.photo" alt="Profile Preview" />
+                          <button @click="store.formData.personal.photo = ''" class="remove-photo-btn">×</button>
+                        </div>
+                        <label v-else class="photo-upload-placeholder">
+                          <input type="file" @change="handlePhotoUpload" accept="image/*" class="photo-file-input" />
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                          <span>Upload Photo</span>
+                        </label>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -422,20 +436,7 @@
         <!-- ====== RIGHT: Preview Panel ====== -->
         <div class="rg-preview-panel">
           <div class="rg-preview-header">
-            <span class="rg-preview-label">Live Preview</span>
-            <!-- Template Switcher -->
-            <div class="rg-template-switcher" id="rg-template-switcher">
-              <button
-                v-for="tmpl in templates"
-                :key="tmpl.id"
-                class="rg-tmpl-btn"
-                :class="{ 'rg-tmpl-btn--active': store.selectedTemplate === tmpl.id }"
-                :id="`rg-tmpl-btn-${tmpl.id}`"
-                @click="store.selectedTemplate = tmpl.id"
-              >
-                {{ tmpl.label }}
-              </button>
-            </div>
+            <span class="rg-preview-label">Live Preview (Minimal)</span>
           </div>
 
           <!-- Scaled Resume Preview -->
@@ -443,9 +444,7 @@
             <div class="rg-preview-scale-outer" id="rg-preview-wrapper">
               <div class="rg-preview-scale-inner" :style="{ transform: `scale(${previewScale})`, transformOrigin: 'top left' }">
                 <div id="printable-resume">
-                  <ClassicTemplate v-if="store.selectedTemplate === 'classic'" :data="store.formData" />
-                  <ModernTemplate  v-else-if="store.selectedTemplate === 'modern'" :data="store.formData" />
-                  <MinimalTemplate v-else-if="store.selectedTemplate === 'minimal'" :data="store.formData" />
+                  <MinimalTemplate :data="store.formData" />
                 </div>
               </div>
             </div>
@@ -463,8 +462,6 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useResumeStore } from '../stores/resume.js'
 
-import ClassicTemplate from '../components/resume/ClassicTemplate.vue'
-import ModernTemplate  from '../components/resume/ModernTemplate.vue'
 import MinimalTemplate from '../components/resume/MinimalTemplate.vue'
 import ReviewStep      from '../components/resume/ReviewStep.vue'
 
@@ -484,11 +481,7 @@ const steps = [
   { id: 'review',      label: 'Review'      },
 ]
 
-const templates = [
-  { id: 'classic', label: 'Classic' },
-  { id: 'modern',  label: 'Modern'  },
-  { id: 'minimal', label: 'Minimal' },
-]
+
 
 // Responsive preview scale
 const previewScale = ref(0.5)
@@ -587,6 +580,22 @@ async function handleSubmit() {
     submitStatus.value = { type: 'error', message: 'Failed to save resume. Please check your backend connection.' }
   }
 }
+
+function handlePhotoUpload(e) {
+  const file = e.target.files[0]
+  if (!file) return
+
+  if (file.size > 2 * 1024 * 1024) {
+    alert('Image size should be less than 2MB')
+    return
+  }
+
+  const reader = new FileReader()
+  reader.onload = (event) => {
+    store.formData.personal.photo = event.target.result
+  }
+  reader.readAsDataURL(file)
+}
 </script>
 
 <style scoped>
@@ -622,6 +631,67 @@ async function handleSubmit() {
 }
 
 @keyframes rotate { to { transform: rotate(360deg); } }
+
+.photo-upload-container {
+  margin-top: 0.5rem;
+}
+
+.photo-upload-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 120px;
+  height: 120px;
+  border: 2px dashed var(--clr-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--clr-text-muted);
+}
+
+.photo-upload-placeholder:hover {
+  border-color: var(--clr-primary);
+  color: var(--clr-primary);
+  background: rgba(99, 102, 241, 0.05);
+}
+
+.photo-file-input {
+  display: none;
+}
+
+.photo-preview {
+  position: relative;
+  width: 120px;
+  height: 120px;
+}
+
+.photo-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--clr-border);
+}
+
+.remove-photo-btn {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--clr-danger);
+  color: white;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
 
 .rg-status-toast {
   margin-top: var(--sp-4);
