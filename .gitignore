@@ -12,6 +12,7 @@ serviceAccountKey.json
 
 # Node.js
 node_modules/
+package-lock.json
 dist/
 dist-ssr/
 *.local
