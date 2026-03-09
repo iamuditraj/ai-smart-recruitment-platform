@@ -1,10 +1,28 @@
 from flask import Blueprint, jsonify, request
 from services.firebase_service import get_db
 from services.ai_service import get_model
+from services.parser_service import extract_text
 from firebase_admin import firestore
 from werkzeug.security import generate_password_hash, check_password_hash
+import io
+import json
+import re
 
 api_bp = Blueprint('api', __name__)
+
+def _clean_json_response(text):
+    """Helper to extract and parse JSON from Gemini markdown output."""
+    try:
+        # Match anything between triple backticks (```json or ```) or the whole text if no backticks
+        match = re.search(r'```(?:json)?\s*([\s\S]*?)```', text)
+        if match:
+            text = match.group(1)
+        # Remove any leading/trailing whitespace
+        text = text.strip()
+        return json.loads(text)
+    except Exception as e:
+        print(f"Error parsing Gemini JSON: {e}\nRaw text: {text}")
+        return None
 
 @api_bp.route('/')
 def home():
@@ -149,17 +167,113 @@ def save_resume():
 @api_bp.route('/api/analyze', methods=['POST'])
 def analyze_resumes():
     try:
-        # In a real scenario, we'd use request.files and request.form
-        # For now, we'll return a success status to confirm integration
+        db = get_db() # Added to get Firestore access if needed
+        model = get_model()
+        if not model:
+            return jsonify({"status": "error", "message": "AI model not initialized"}), 500
+
+        # 1. Get Job Description and Resumes
+        job_description = request.form.get('jobDescription', 'No JD provided')
+        resumes = request.files.getlist('resumes')
+
+        if not resumes:
+            return jsonify({"status": "error", "message": "No resumes uploaded"}), 400
+
+        parsed_results = []
+        
+        for file in resumes:
+            # 2. Extract Text from file
+            # Read into memory first to avoid file-system issues
+            file_stream = io.BytesIO(file.read())
+            extracted_text = extract_text(file_stream, file.filename)
+            
+            # 3. Prompt Gemini for matching
+            prompt = f"""
+            Task: Compare the following resume text against the Job Description (JD).
+            
+            JD: {job_description}
+            
+            Resume Text: {extracted_text}
+            
+            Respond STRICTLY with a JSON object containing:
+            - name: The candidate's name (found in resume, if not found use filename: {file.filename})
+            - score: A match percentage (0-100) based on JD requirements
+            - status: One of "Shortlist" (score >= 80), "Review" (60-79), or "Reject" (<60)
+            - badgeClass: One of "badge-success", "badge-warning", or "badge-danger" corresponding to status
+            - skills: Top 4 technical skills found in resume
+            - experience: A one-sentence summary (e.g., "5 years - Senior Dev at Google")
+            
+            JSON only, no additional talk.
+            """
+            
+            response = model.generate_content(prompt)
+            data = _clean_json_response(response.text)
+            
+            if data:
+                parsed_results.append(data)
+            else:
+                # Fallback if AI fails to format JSON correctly
+                parsed_results.append({
+                    "name": file.filename,
+                    "score": 0,
+                    "status": "Error",
+                    "badgeClass": "badge-danger",
+                    "skills": [],
+                    "experience": "Could not parse analysis"
+                })
+
+        # 4. Sort by score descending
+        parsed_results.sort(key=lambda x: x.get('score', 0), reverse=True)
+
         return jsonify({
             "status": "success",
-            "message": "Resumes received and analyzed by Flask!",
-            "results": [
-                { "name": "Priya_Sharma_Resume.pdf", "score": 92, "status": "Shortlist", "badgeClass": "badge-success", "skills": ["Python", "NLP", "TensorFlow", "BERT"], "experience": "5 years — Senior ML Engineer at TechCorp" },
-                { "name": "Arjun_Mehta_Resume.pdf", "score": 78, "status": "Review", "badgeClass": "badge-warning", "skills": ["Python", "Scikit-learn", "SQL"], "experience": "3 years — Data Scientist at StartupX" }
-            ]
+            "message": f"Successfully analyzed {len(parsed_results)} resumes!",
+            "results": parsed_results
         })
     except Exception as e:
+        print(f"Error in analyze_resumes: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@api_bp.route('/api/generate-assessment', methods=['POST'])
+def generate_assessment():
+    try:
+        model = get_model()
+        if not model:
+            return jsonify({"status": "error", "message": "AI model not initialized"}), 500
+
+        data = request.json
+        role_label = data.get('role', 'Generic Developer')
+        
+        prompt = f"""
+        Generate a professional technical skill assessment for the role: {role_label}.
+        
+        Requirements:
+        1. Create exactly 5 multiple-choice questions.
+        2. Questions should range from basic to intermediate difficulty.
+        3. Respond ONLY with a JSON array of objects, with this structure:
+           [
+             {{
+               "text": "The question text?",
+               "options": ["Option A", "Option B", "Option C", "Option D"],
+               "correct": 1  // index of the correct option (0-3)
+             }}
+           ]
+        
+        JSON only. No Markdown, no explanations.
+        """
+        
+        response = model.generate_content(prompt)
+        questions = _clean_json_response(response.text)
+        
+        if not questions:
+            return jsonify({"status": "error", "message": "Failed to generate AI questions"}), 500
+            
+        return jsonify({
+            "status": "success",
+            "questions": questions
+        })
+    except Exception as e:
+        print(f"Error in generate_assessment: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @api_bp.route('/api/profile', methods=['GET', 'POST'])

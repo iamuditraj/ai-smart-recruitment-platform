@@ -6,9 +6,10 @@
           <h1 class="page-title">Skill Assessment</h1>
           <p class="page-subtitle">Auto-generated role-specific technical tests for early-stage evaluation</p>
         </div>
-        <button class="btn btn-primary" id="generate-test-btn" @click="generateTest">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-          Generate Test
+        <button class="btn btn-primary" id="generate-test-btn" @click="generateTest" :disabled="isGenerating">
+          <svg v-if="!isGenerating" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <span v-else class="loader-sm"></span>
+          {{ isGenerating ? 'Creating AI Test...' : 'Generate AI Test' }}
         </button>
       </div>
 
@@ -94,12 +95,14 @@
 
 <script setup>
 import { ref, computed, onUnmounted } from 'vue'
+import axios from 'axios'
 
 const selectedRole = ref('ml')
 const questions = ref([])
 const showResult = ref(false)
 const resultScore = ref(0)
 const timeLeft = ref(1800)
+const isGenerating = ref(false)
 let timerInterval = null
 
 const roles = [
@@ -108,30 +111,6 @@ const roles = [
   { id: 'frontend', name: 'Frontend Dev', icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>` },
   { id: 'devops', name: 'DevOps', icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>` },
 ]
-
-const questionBank = {
-  ml: [
-    { text: 'What is the purpose of a validation set in machine learning?', options: ['To train the model', 'To tune hyperparameters and prevent overfitting', 'To test the model after training', 'To clean the data'], answer: null },
-    { text: 'Which algorithm is best suited for text classification tasks?', options: ['K-Means Clustering', 'Linear Regression', 'Naive Bayes / BERT', 'Principal Component Analysis'], answer: null },
-    { text: 'What does "overfitting" mean in a ML model?', options: ['Model performs well on training but poorly on new data', 'Model has too few parameters', 'Model trains too slowly', 'Model uses too much memory'], answer: null },
-    { text: 'Which metric is most suitable for imbalanced classification?', options: ['Accuracy', 'Mean Squared Error', 'F1-Score', 'R-Squared'], answer: null },
-  ],
-  backend: [
-    { text: 'What is the difference between REST and GraphQL?', options: ['REST uses XML, GraphQL uses JSON', 'GraphQL allows clients to request specific data, REST returns fixed schemas', 'They are the same', 'REST is faster in all cases'], answer: null },
-    { text: 'Which HTTP status code indicates a resource was created successfully?', options: ['200 OK', '204 No Content', '201 Created', '302 Found'], answer: null },
-    { text: 'What is database indexing used for?', options: ['To encrypt data', 'To speed up query performance', 'To back up data', 'To compress storage'], answer: null },
-  ],
-  frontend: [
-    { text: 'What is the Virtual DOM in React/Vue?', options: ['A browser feature', 'A lightweight copy of DOM used to optimize real DOM updates', 'A CSS framework', 'A server-side rendering tool'], answer: null },
-    { text: 'Which CSS property is used to create a flex container?', options: ['display: block', 'display: flex', 'position: flex', 'float: left'], answer: null },
-    { text: 'What does Vue\'s `v-model` directive do?', options: ['One-way data binding', 'Two-way data binding between form inputs and state', 'Conditional rendering', 'Loops through items'], answer: null },
-  ],
-  devops: [
-    { text: 'What is the purpose of Docker containers?', options: ['To replace virtual machines entirely', 'To package and isolate applications with their dependencies', 'A programming language', 'A cloud provider'], answer: null },
-    { text: 'What does CI/CD stand for?', options: ['Code Injection / Code Deployment', 'Continuous Integration / Continuous Deployment', 'Cloud Infrastructure / Cloud Delivery', 'Configuration Interface / Configuration Driven'], answer: null },
-    { text: 'What is Kubernetes used for?', options: ['Building web apps', 'Container orchestration and management', 'Database management', 'Version control'], answer: null },
-  ],
-}
 
 const answeredCount = computed(() => questions.value.filter(q => q.answer !== null).length)
 const formattedTime = computed(() => {
@@ -146,24 +125,44 @@ const resultLabel = computed(() => {
   return '❌ Below threshold — Needs improvement'
 })
 
-function generateTest() {
-  const bank = questionBank[selectedRole.value] || questionBank.ml
-  questions.value = bank.map(q => ({ ...q, answer: null }))
-  showResult.value = false
-  timeLeft.value = 1800
-  if (timerInterval) clearInterval(timerInterval)
-  timerInterval = setInterval(() => {
-    if (timeLeft.value > 0) timeLeft.value--
-    else clearInterval(timerInterval)
-  }, 1000)
+async function generateTest() {
+  isGenerating.value = true
+  try {
+    const roleObj = roles.find(r => r.id === selectedRole.value)
+    const response = await axios.post('http://localhost:5001/api/generate-assessment', {
+      role: roleObj ? roleObj.name : selectedRole.value
+    })
+
+    if (response.data.status === 'success') {
+      questions.value = response.data.questions.map(q => ({ ...q, answer: null }))
+      showResult.value = false
+      timeLeft.value = 600 // 10 minutes for 5 questions
+
+      if (timerInterval) clearInterval(timerInterval)
+      timerInterval = setInterval(() => {
+        if (timeLeft.value > 0) timeLeft.value--
+        else {
+          clearInterval(timerInterval)
+          submit() // Auto-submit on time out
+        }
+      }, 1000)
+    }
+  } catch (err) {
+    console.error('Failed to generate test:', err)
+    alert('Could not generate AI test. Make sure the backend is running.')
+  } finally {
+    isGenerating.value = false
+  }
 }
 
 function submit() {
+  if (!questions.value.length) return
+
   const total = questions.value.length
-  const correct = questions.value.filter((q, i) => q.answer === [1, 2, 0, 2, 1, 2, 1, 1, 2, 1, 1, 2][i % 4]).length
+  const correct = questions.value.filter(q => q.answer === q.correct).length
   resultScore.value = Math.round((correct / total) * 100)
+
   showResult.value = true
-  questions.value = []
   if (timerInterval) clearInterval(timerInterval)
 }
 
