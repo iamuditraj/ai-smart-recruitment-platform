@@ -152,6 +152,17 @@
                 <span v-for="skill in selectedCandidate.skills" :key="skill" class="v-tag large">{{ skill }}</span>
               </div>
             </div>
+
+            <div v-if="selectedCandidate.resumeUrl" class="v-modal-section">
+              <h4 class="section-label">Resume</h4>
+              <div class="resume-preview-box">
+                <div class="resume-info-mini">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  <span>{{ selectedCandidate.resumeName || 'Candidate_Resume.pdf' }}</span>
+                </div>
+                <button class="btn btn-outline btn-sm" @click="viewResume(selectedCandidate)">View Full PDF</button>
+              </div>
+            </div>
           </div>
 
           <div class="v-modal-footer">
@@ -165,95 +176,70 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, onMounted, computed } from 'vue'
+import { useAuthStore } from '../stores/auth'
 
+const authStore = useAuthStore()
 const search = ref('')
 const filterStatus = ref('')
 const selectedCandidate = ref(null)
+const candidates = ref([])
+const isLoading = ref(true)
 
-const candidates = [
-  {
-    id: 1,
-    name: 'Priya Sharma',
-    initials: 'PS',
-    role: 'Senior ML Engineer',
-    score: 92,
-    experience: '5 yrs',
-    location: 'Bangalore, IN',
-    matchReason: 'Expert in BERT & LLM architectures',
-    skills: ['Python', 'NLP', 'TensorFlow', 'BERT', 'MLOps'],
-    status: 'Shortlisted',
-    avatarGrad: 'linear-gradient(135deg, #6366f1, #8b5cf6)'
-  },
-  {
-    id: 2,
-    name: 'Rahul Joshi',
-    initials: 'RJ',
-    role: 'DevOps Lead',
-    score: 95,
-    experience: '6 yrs',
-    location: 'Remote',
-    matchReason: 'Infrastructure automation specialist',
-    skills: ['Kubernetes', 'Docker', 'CI/CD', 'Terraform', 'AWS'],
-    status: 'Shortlisted',
-    avatarGrad: 'linear-gradient(135deg, #06b6d4, #6366f1)'
-  },
-  {
-    id: 3,
-    name: 'Riya Kapoor',
-    initials: 'RK',
-    role: 'ML Engineer',
-    score: 85,
-    experience: '4 yrs',
-    location: 'Mumbai, IN',
-    matchReason: 'Strong deployment & pipeline experience',
-    skills: ['PyTorch', 'MLOps', 'Docker', 'AWS', 'Python'],
-    status: 'Shortlisted',
-    avatarGrad: 'linear-gradient(135deg, #10b981, #06b6d4)'
-  },
-  {
-    id: 4,
-    name: 'Arjun Mehta',
-    initials: 'AM',
-    role: 'Data Scientist',
-    score: 78,
-    experience: '3 yrs',
-    location: 'Pune, IN',
-    matchReason: 'Solid foundations in statistical modeling',
-    skills: ['Python', 'Scikit-learn', 'SQL', 'Pandas'],
-    status: 'Under Review',
-    avatarGrad: 'linear-gradient(135deg, #f59e0b, #ef4444)'
-  },
-  {
-    id: 5,
-    name: 'Neha Singh',
-    initials: 'NS',
-    role: 'Full Stack Dev',
-    score: 74,
-    experience: '2 yrs',
-    location: 'Noida, IN',
-    matchReason: 'Modern web stack proficiency',
-    skills: ['React', 'Node.js', 'MongoDB', 'TypeScript'],
-    status: 'Under Review',
-    avatarGrad: 'linear-gradient(135deg, #8b5cf6, #ec4899)'
-  },
-  {
-    id: 6,
-    name: 'Vikram Nair',
-    initials: 'VN',
-    role: 'Product Designer',
-    score: 48,
-    experience: '1 yr',
-    location: 'Chennai, IN',
-    matchReason: 'Good aesthetic sense, limited tech knowledge',
-    skills: ['Figma', 'Adobe XD', 'Prototyping'],
-    status: 'Rejected',
-    avatarGrad: 'linear-gradient(135deg, #64748b, #475569)'
-  },
-]
+async function fetchCandidates() {
+  if (!authStore.user?.email) return
+
+  isLoading.value = true
+  try {
+    const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/recruiter/applications?email=${authStore.user.email}`)
+    const data = await res.json()
+
+    if (data.status === 'success') {
+      candidates.value = data.applications.map(app => ({
+        id: app.id,
+        name: app.candidate_name,
+        initials: app.candidate_name?.split(' ').map(n => n[0]).join('').toUpperCase() || '??',
+        role: 'Applicant', // In real world, we'd fetch the job title too
+        score: Math.floor(Math.random() * 40) + 60, // Placeholder AI Score for now
+        experience: app.experience || 'Not specified',
+        location: 'Remote',
+        matchReason: 'Applied through platform',
+        skills: ['Python', 'React', 'AI'], // Mock skills for UI
+        status: app.status || 'Applied',
+        resumeUrl: app.resumeUrl,
+        resumeName: app.resumeName,
+        avatarGrad: `linear-gradient(135deg, #${Math.floor(Math.random()*16777215).toString(16)}, #${Math.floor(Math.random()*16777215).toString(16)})`
+      }))
+    }
+  } catch (err) {
+    console.error('Fetch candidates error:', err)
+  } finally {
+    isLoading.value = false
+  }
+}
+
+function viewResume(candidate) {
+  const dataUri = candidate.resumeUrl
+  if (!dataUri) return
+
+  try {
+    const base64 = dataUri.split(',')[1]
+    const binary = atob(base64)
+    const array = []
+    for (let i = 0; i < binary.length; i++) {
+      array.push(binary.charCodeAt(i))
+    }
+    const blob = new Blob([new Uint8Array(array)], { type: 'application/pdf' })
+    const url = URL.createObjectURL(blob)
+    window.open(url, '_blank')
+  } catch (error) {
+    console.error('Error viewing resume:', error)
+    window.open(dataUri, '_blank')
+  }
+}
 
 const filteredCandidates = computed(() => {
-  return candidates
+  return candidates.value
     .filter(c => {
       const matchSearch = !search.value ||
         c.name.toLowerCase().includes(search.value.toLowerCase()) ||
@@ -266,10 +252,12 @@ const filteredCandidates = computed(() => {
 })
 
 function statusClass(status) {
-  if (status === 'Shortlisted') return 'success'
-  if (status === 'Under Review') return 'warning'
+  if (status === 'Shortlisted' || status === 'Shortlist') return 'success'
+  if (status === 'Applied' || status === 'Under Review') return 'warning'
   return 'danger'
 }
+
+onMounted(fetchCandidates)
 </script>
 
 <style scoped>
@@ -616,6 +604,24 @@ function statusClass(status) {
 
 .v-skill-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .v-tag.large { padding: 0.5rem 1rem; font-size: 0.85rem; border-radius: 10px; }
+
+.resume-preview-box {
+  background: var(--clr-surface-2);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.resume-info-mini {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
 
 .v-modal-footer {
   margin-top: 2rem;

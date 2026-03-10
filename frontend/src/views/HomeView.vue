@@ -92,9 +92,9 @@
         <div class="cta-banner__inner">
           <div class="cta-banner__bg-orb"></div>
           <h2 class="cta-banner__title">Ready to Transform Your Hiring?</h2>
-          <p class="cta-banner__subtitle">Start screening smarter — upload your first resume in seconds.</p>
-          <RouterLink to="/resume-screening" class="btn btn-primary" id="cta-banner-btn">
-            Start for Free
+          <p class="cta-banner__subtitle">Post your first job and let AI rank candidates instantly.</p>
+          <RouterLink to="/login" class="btn btn-primary" id="cta-banner-btn">
+            Get Started
           </RouterLink>
         </div>
       </div>
@@ -114,11 +114,11 @@ const stats = [
 
 const features = [
   {
-    title: 'Resume Screening',
-    desc: 'Upload resumes in bulk. Our NLP engine parses, extracts skills, and scores candidates against your job description instantly.',
+    title: 'Automated Screening',
+    desc: 'Candidates apply through the platform. Our AI automatically parses profiles, extracts skills, and scores them against your job requirements.',
     icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="12" y2="17"/></svg>`,
     gradient: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-    link: '/resume-screening',
+    link: '/manage-jobs',
   },
   {
     title: 'Candidate Ranking',
@@ -144,10 +144,10 @@ const features = [
 ]
 
 const steps = [
-  { title: 'Upload Resumes', desc: 'Upload candidate resumes in PDF or DOCX format. Supports bulk uploads.' },
-  { title: 'AI Parsing & Scoring', desc: 'NLP engine extracts skills, experience, and education. Scores against the job description.' },
-  { title: 'Rank & Filter', desc: 'View ranked candidates on the dashboard. Filter by score, skills, or assessment results.' },
-  { title: 'Assess & Interview', desc: 'Shortlisted candidates take skill assessments and mock interviews before final rounds.' },
+  { title: 'Post Job', desc: 'Define your job requirements and post it on the portal for candidates.' },
+  { title: 'AI Analysis', desc: 'As candidates apply, AI parses their profiles and scores them for relevance.' },
+  { title: 'Rank & Shortlist', desc: 'View a dynamically ranked list of applicants and shortlist the best fits.' },
+  { title: 'Interview & Hire', desc: 'Invite top candidates for assessments and interviews to finalize your hire.' },
 ]
 </script>
 

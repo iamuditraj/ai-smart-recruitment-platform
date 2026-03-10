@@ -70,6 +70,12 @@ const router = createRouter({
       component: () => import('../views/SkillAssessmentView.vue'),
       meta: { title: 'Skill Assessment — HireAI', requiresAuth: true, role: 'candidate' },
     },
+    {
+      path: '/mock-interview',
+      name: 'mock-interview',
+      component: () => import('../views/MockInterviewView.vue'),
+      meta: { title: 'AI Mock Interview — HireAI', requiresAuth: true, role: 'candidate' },
+    },
   ],
   scrollBehavior() {
     return { top: 0, behavior: 'smooth' }
