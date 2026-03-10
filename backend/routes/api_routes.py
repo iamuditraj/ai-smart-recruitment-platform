@@ -7,6 +7,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import io
 import json
 import re
+import datetime
 
 api_bp = Blueprint('api', __name__)
 
@@ -326,6 +327,63 @@ def handle_profile():
         print(f"Error in handle_profile: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
+@api_bp.route('/api/profile/upload-resume', methods=['POST'])
+def upload_resume():
+    try:
+        import base64
+        db = get_db()
+        if not db:
+            return jsonify({"status": "error", "message": "Firebase not initialized"}), 500
+
+        email = request.form.get('email')
+        if not email:
+            return jsonify({"status": "error", "message": "Email is required"}), 400
+
+        if 'resume' not in request.files:
+            return jsonify({"status": "error", "message": "No resume file provided"}), 400
+
+        file = request.files['resume']
+        if file.filename == '':
+            return jsonify({"status": "error", "message": "No selected file"}), 400
+
+        if not file.filename.lower().endswith('.pdf'):
+            return jsonify({"status": "error", "message": "Only PDF files are allowed"}), 400
+
+        # Read file and convert to Base64
+        file_bytes = file.read()
+        
+        # Check size limit for Firestore (1MB limit per document)
+        # We leave some room for other metadata (max 900KB)
+        if len(file_bytes) > 900 * 1024:
+            return jsonify({
+                "status": "error", 
+                "message": "File too large for free tier storage (Max 900KB). Please compress your PDF or use a smaller file."
+            }), 400
+
+        encoded_string = base64.b64encode(file_bytes).decode('utf-8')
+        resume_data_uri = f"data:application/pdf;base64,{encoded_string}"
+
+        # Update user profile in Firestore
+        user_ref = db.collection('users').document(email)
+        user_ref.update({
+            'resumeUrl': resume_data_uri,
+            'resumeName': file.filename,
+            'updatedAt': firestore.SERVER_TIMESTAMP
+        })
+
+        return jsonify({
+            "status": "success",
+            "message": "Resume saved successfully to profile!",
+            "resumeUrl": resume_data_uri,
+            "resumeName": file.filename
+        })
+
+    except Exception as e:
+        import traceback
+        print(f"Error in upload_resume: {e}")
+        traceback.print_exc()
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @api_bp.route('/api/jobs', methods=['GET', 'POST'])
 def handle_jobs():
     try:
@@ -404,6 +462,54 @@ def apply_for_job():
         return jsonify({"status": "success", "message": "Applied successfully!"})
 
     except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@api_bp.route('/api/recruiter/applications', methods=['GET'])
+def get_recruiter_applications():
+    try:
+        db = get_db()
+        recruiter_email = request.args.get('email')
+        if not recruiter_email:
+            return jsonify({"status": "error", "message": "Recruiter email is required"}), 400
+
+        # 1. Get all job IDs belonging to this recruiter
+        jobs_docs = db.collection('jobs').where('recruiter_email', '==', recruiter_email).get()
+        job_ids = [doc.id for doc in jobs_docs]
+
+        if not job_ids:
+            return jsonify({"status": "success", "applications": []})
+
+        # 2. Get all applications for these jobs
+        # Firestore 'in' query has a limit of 10 items. For simplicity, we fetch all and filter or loop.
+        # Here we loop through job_ids since it's likely small for a MVP
+        all_apps = []
+        for j_id in job_ids:
+            apps = db.collection('job_applications').where('job_id', '==', j_id).get()
+            for app_doc in apps:
+                app_data = app_doc.to_dict()
+                
+                # Fetch candidate profile to get name and resume
+                c_email = app_data.get('candidate_email')
+                user_doc = db.collection('users').document(c_email).get()
+                if user_doc.exists:
+                    user_data = user_doc.to_dict()
+                    app_data['candidate_name'] = user_data.get('name', 'Unknown')
+                    app_data['resumeUrl'] = user_data.get('resumeUrl')
+                    app_data['resumeName'] = user_data.get('resumeName')
+                    app_data['experience'] = user_data.get('bio', '') # Using bio as teaser experience
+                
+                if 'applied_at' in app_data and app_data['applied_at']:
+                    app_data['applied_at'] = app_data['applied_at'].isoformat()
+                
+                all_apps.append(app_data)
+
+        return jsonify({
+            "status": "success",
+            "applications": all_apps
+        })
+
+    except Exception as e:
+        print(f"Error in get_recruiter_applications: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @api_bp.route('/api/check-db')

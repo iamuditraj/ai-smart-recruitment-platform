@@ -96,6 +96,33 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function uploadResume(file) {
+    if (!user.value?.email) return { success: false, message: 'Not logged in' }
+
+    try {
+      const formData = new FormData()
+      formData.append('resume', file)
+      formData.append('email', user.value.email)
+
+      const response = await fetch(`${API_BASE_URL}/api/profile/upload-resume`, {
+        method: 'POST',
+        body: formData
+      })
+      const data = await response.json()
+
+      if (data.status === 'success') {
+        // Refresh user data to get the new resume URL
+        await refreshUser()
+        return { success: true, url: data.resumeUrl, name: data.resumeName }
+      } else {
+        return { success: false, message: data.message }
+      }
+    } catch (error) {
+      console.error('Resume upload error:', error)
+      return { success: false, message: 'Server connection failed' }
+    }
+  }
+
   function logout() {
     user.value = null
     role.value = null
@@ -112,6 +139,7 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     signup,
     updateProfile,
+    uploadResume,
     refreshUser,
     logout
   }

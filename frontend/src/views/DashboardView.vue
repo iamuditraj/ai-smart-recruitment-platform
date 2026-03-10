@@ -7,9 +7,6 @@
           <h1 class="dashboard__title">Dashboard</h1>
           <p class="dashboard__subtitle">Overview of your recruitment pipeline</p>
         </div>
-        <RouterLink to="/resume-screening" class="btn btn-primary" id="dashboard-upload-btn">
-          + Upload Resumes
-        </RouterLink>
       </div>
 
       <!-- KPI Cards -->
@@ -112,7 +109,7 @@ const pipeline = [
 ]
 
 const activity = [
-  { text: '12 new resumes uploaded for "Senior ML Engineer"', time: '2 min ago', color: '#6366f1' },
+  { text: '5 new applications received for "Senior ML Engineer"', time: '2 min ago', color: '#6366f1' },
   { text: 'Riya Kapoor scored 92% — moved to Shortlisted', time: '18 min ago', color: '#10b981' },
   { text: 'Skill assessment sent to 8 candidates', time: '1 hr ago', color: '#06b6d4' },
   { text: 'Arjun Mehta completed mock interview analysis', time: '3 hrs ago', color: '#8b5cf6' },

@@ -24,25 +24,25 @@
         <div class="rg-form-panel">
 
           <!-- Step Progress -->
-          <div class="rg-stepper" id="rg-stepper">
-            <div
-              v-for="(step, i) in steps"
-              :key="step.id"
-              class="rg-step"
-              :class="{
-                'rg-step--active':    currentStep === i,
-                'rg-step--done':      currentStep > i,
-              }"
-              :id="`rg-step-indicator-${i}`"
-              @click="goToStep(i)"
-            >
-              <div class="rg-step__bullet">
-                <svg v-if="currentStep > i" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
-                <span v-else>{{ i + 1 }}</span>
+            <div class="rg-stepper" id="rg-stepper">
+              <div
+                v-for="(step, i) in steps"
+                :key="step.id"
+                class="rg-step"
+                :class="{
+                  'rg-step--active':    currentStep === i,
+                  'rg-step--done':      isStepDone(i),
+                }"
+                :id="`rg-step-indicator-${i}`"
+                @click="goToStep(i)"
+              >
+                <div class="rg-step__bullet">
+                  <svg v-if="isStepDone(i)" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span v-else>{{ i + 1 }}</span>
+                </div>
+                <span class="rg-step__label">{{ step.label }}</span>
               </div>
-              <span class="rg-step__label">{{ step.label }}</span>
             </div>
-          </div>
 
           <!-- Step Content -->
           <div class="rg-form-body card">
@@ -498,6 +498,21 @@ onMounted(() => {
   window.addEventListener('resize', computePreviewScale)
 })
 onUnmounted(() => window.removeEventListener('resize', computePreviewScale))
+
+function isStepDone(index) {
+  const breakdown = store.completenessBreakdown
+  if (!breakdown) return false
+
+  switch (index) {
+    case 0: return !!store.formData.personal.fullName?.trim() && !!store.formData.personal.email?.trim()
+    case 1: return (store.formData.summary || '').trim().length >= 20
+    case 2: return store.formData.experience.some(e => e.title?.trim() && e.company?.trim())
+    case 3: return store.formData.education.some(e => e.degree?.trim() && e.institution?.trim())
+    case 4: return store.formData.skills.technical.length >= 2
+    case 5: return store.formData.projects.some(p => p.name?.trim()) || store.formData.certifications.some(c => c.name?.trim())
+    default: return false
+  }
+}
 
 // Step navigation
 function goToStep(i) {
