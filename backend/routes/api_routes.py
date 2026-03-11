@@ -203,6 +203,7 @@ def analyze_resumes():
             - badgeClass: One of "badge-success", "badge-warning", or "badge-danger" corresponding to status
             - skills: Top 4 technical skills found in resume
             - experience: A one-sentence summary (e.g., "5 years - Senior Dev at Google")
+            - category: The most fitting job domain for this resume, one of: INFORMATION-TECHNOLOGY, FINANCE, HEALTHCARE, ENGINEERING, BUSINESS-DEVELOPMENT, HR, SALES, MARKETING, EDUCATION, LEGAL, or OTHER
             
             JSON only, no additional talk.
             """
@@ -212,6 +213,20 @@ def analyze_resumes():
             
             if data:
                 parsed_results.append(data)
+
+                # 4. Auto-save to Firestore candidate_profiles collection
+                if db:
+                    try:
+                        # Use sanitized filename as document ID
+                        doc_id = re.sub(r'[^\w]', '_', file.filename)
+                        db.collection('candidate_profiles').document(doc_id).set({
+                            **data,
+                            "source_file": file.filename,
+                            "job_description": job_description[:300],  # store first 300 chars of JD
+                            "analyzed_at": firestore.SERVER_TIMESTAMP
+                        })
+                    except Exception as save_err:
+                        print(f"Warning: Could not save to Firestore: {save_err}")
             else:
                 # Fallback if AI fails to format JSON correctly
                 parsed_results.append({
@@ -220,7 +235,8 @@ def analyze_resumes():
                     "status": "Error",
                     "badgeClass": "badge-danger",
                     "skills": [],
-                    "experience": "Could not parse analysis"
+                    "experience": "Could not parse analysis",
+                    "category": "OTHER"
                 })
 
         # 4. Sort by score descending
