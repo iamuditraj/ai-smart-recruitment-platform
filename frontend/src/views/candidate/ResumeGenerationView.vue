@@ -460,10 +460,10 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
-import { useResumeStore } from '../stores/resume.js'
+import { useResumeStore } from '../../stores/resume.js'
 
-import MinimalTemplate from '../components/resume/MinimalTemplate.vue'
-import ReviewStep      from '../components/resume/ReviewStep.vue'
+import MinimalTemplate from '../../components/resume/MinimalTemplate.vue'
+import ReviewStep      from '../../components/resume/ReviewStep.vue'
 
 const store = useResumeStore()
 

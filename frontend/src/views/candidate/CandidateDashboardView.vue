@@ -4,8 +4,8 @@
       <!-- Header -->
       <div class="dashboard__header animate-fade-in-up">
         <div>
-          <h1 class="dashboard__title">Candidate Dashboard</h1>
-          <p class="dashboard__subtitle">Track your job applications and improvements</p>
+          <h1 class="dashboard__title">Welcome back, {{ authStore.user?.name?.split(' ')[0] || 'there' }} 👋</h1>
+          <p class="dashboard__subtitle">Track your applications, improve your skills, and land your dream job.</p>
         </div>
         <RouterLink to="/resume-generation" class="btn btn-primary" id="dashboard-build-btn">
           Improve Your Resume
@@ -76,6 +76,9 @@
 </template>
 
 <script setup>
+import { useAuthStore } from '../../stores/auth'
+const authStore = useAuthStore()
+
 const kpis = [
   { label: 'Applications', value: '12', gradient: 'linear-gradient(135deg,#6366f1,#8b5cf6)', icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' },
   { label: 'Interviews', value: '3', gradient: 'linear-gradient(135deg,#06b6d4,#6366f1)', icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>' },

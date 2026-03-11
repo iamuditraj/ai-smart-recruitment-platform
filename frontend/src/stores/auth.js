@@ -5,7 +5,10 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(JSON.parse(localStorage.getItem('auth_user') || 'null'))
-  const role = ref(localStorage.getItem('user_role') || null)
+
+  // Derive role directly from user object so it is always in sync.
+  // Falls back to localStorage so the sidebar renders correctly on first load.
+  const role = computed(() => user.value?.role || localStorage.getItem('user_role') || null)
 
   const isAuthenticated = computed(() => !!user.value)
   const isRecruiter = computed(() => role.value === 'recruiter')
@@ -90,6 +93,10 @@ export const useAuthStore = defineStore('auth', () => {
       if (data.status === 'success') {
         user.value = data.user
         localStorage.setItem('auth_user', JSON.stringify(data.user))
+        // Keep user_role in sync so role computed stays correct even before vue reactivity settles
+        if (data.user.role) {
+          localStorage.setItem('user_role', data.user.role)
+        }
       }
     } catch (error) {
       console.error('Refresh user error:', error)
@@ -125,7 +132,6 @@ export const useAuthStore = defineStore('auth', () => {
 
   function logout() {
     user.value = null
-    role.value = null
     localStorage.removeItem('auth_user')
     localStorage.removeItem('user_role')
   }
