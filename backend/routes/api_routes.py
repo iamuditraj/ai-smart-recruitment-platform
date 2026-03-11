@@ -379,11 +379,48 @@ def upload_resume():
         encoded_string = base64.b64encode(file_bytes).decode('utf-8')
         resume_data_uri = f"data:application/pdf;base64,{encoded_string}"
 
+        # --- Extract text and parse with Gemini ---
+        parsed_resume = None
+        try:
+            file_stream = io.BytesIO(file_bytes)
+            raw_text = extract_text(file_stream, file.filename)
+
+            model = get_model()
+            if model and raw_text:
+                prompt = f"""
+You are a resume parser. Extract all structured information from the resume text below.
+Respond STRICTLY with a single JSON object (no markdown fences, no extra text) with these fields:
+- name: string
+- email: string
+- phone: string
+- summary: string (professional summary or objective)
+- skills: array of strings
+- experience: array of objects with keys: title, company, duration, description
+- education: array of objects with keys: degree, institution, year
+- certifications: array of strings
+- languages: array of strings
+
+If a field is not found, use an empty string or empty array as appropriate.
+
+Resume Text:
+{raw_text}
+"""
+                response = model.generate_content(prompt)
+                parsed_resume = _clean_json_response(response.text)
+                print(f"✅ Resume parsed successfully for {email}")
+            else:
+                print("⚠️  Skipping Gemini parse: model not ready or no text extracted.")
+        except Exception as parse_err:
+            print(f"⚠️  Could not parse resume with Gemini: {parse_err}")
+            parsed_resume = None
+        # --- End parse ---
+
         # Update user profile in Firestore
         user_ref = db.collection('users').document(email)
         user_ref.update({
             'resumeUrl': resume_data_uri,
             'resumeName': file.filename,
+            'parsedResume': parsed_resume,
             'updatedAt': firestore.SERVER_TIMESTAMP
         })
 
@@ -391,7 +428,8 @@ def upload_resume():
             "status": "success",
             "message": "Resume saved successfully to profile!",
             "resumeUrl": resume_data_uri,
-            "resumeName": file.filename
+            "resumeName": file.filename,
+            "parsedResume": parsed_resume
         })
 
     except Exception as e:
