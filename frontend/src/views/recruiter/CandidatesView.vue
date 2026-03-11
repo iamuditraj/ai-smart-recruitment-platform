@@ -177,7 +177,7 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { useAuthStore } from '../stores/auth'
+import { useAuthStore } from '../../stores/auth'
 
 const authStore = useAuthStore()
 const search = ref('')

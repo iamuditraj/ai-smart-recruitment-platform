@@ -4,7 +4,7 @@
       <!-- Header -->
       <div class="dashboard__header animate-fade-in-up">
         <div>
-          <h1 class="dashboard__title">Dashboard</h1>
+          <h1 class="dashboard__title">Welcome back, {{ authStore.user?.name?.split(' ')[0] || 'Recruiter' }} 👋</h1>
           <p class="dashboard__subtitle">Overview of your recruitment pipeline</p>
         </div>
       </div>
@@ -64,6 +64,9 @@
 </template>
 
 <script setup>
+import { useAuthStore } from '../../stores/auth'
+const authStore = useAuthStore()
+
 const kpis = [
   { label: 'Total Applicants', value: '248', change: '12%', up: true,
     gradient: 'linear-gradient(135deg,#6366f1,#8b5cf6)',

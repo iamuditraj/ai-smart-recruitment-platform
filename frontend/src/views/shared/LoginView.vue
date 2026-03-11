@@ -17,84 +17,56 @@
               </defs>
             </svg>
           </div>
-          <h1 class="login-title">Create Account</h1>
-          <p class="login-subtitle">Join HireAI to start your journey</p>
+          <h1 class="login-title">Hire<span class="gradient-text">AI</span> Portal</h1>
+          <p class="login-subtitle">Connect to your recruitment workspace</p>
         </div>
 
-        <form @submit.prevent="handleSignup" class="login-form">
+        <form @submit.prevent="handleLogin" class="login-form">
+          <!-- Role Selection -->
+          <div class="role-tabs" style="display: none;"> <!-- Role is now determined by backend on login, but for login we might just need email/pass -->
+          </div>
+
           <div v-if="errorMessage" class="error-banner animate-fade-in">
             {{ errorMessage }}
           </div>
 
           <div class="form-group">
-            <label class="form-label">I am a...</label>
-            <div class="role-tabs">
-              <button
-                type="button"
-                @click="role = 'candidate'"
-                class="role-tab"
-                :class="{ active: role === 'candidate' }"
-              >
-                Candidate
-              </button>
-              <button
-                type="button"
-                @click="role = 'recruiter'"
-                class="role-tab"
-                :class="{ active: role === 'recruiter' }"
-              >
-                Recruiter
-              </button>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label" for="signup-name">Full Name</label>
-            <input
-              v-model="name"
-              type="text"
-              id="signup-name"
-              class="form-input"
-              placeholder="Your Name"
-              required
-            />
-          </div>
-
-          <div class="form-group">
-            <label class="form-label" for="signup-email">Email Address</label>
+            <label class="form-label" for="login-email">Email Address</label>
             <input
               v-model="email"
               type="email"
-              id="signup-email"
+              id="login-email"
               class="form-input"
-              placeholder="name@example.com"
+              placeholder="name@company.com"
               required
             />
           </div>
 
           <div class="form-group">
-            <label class="form-label" for="signup-password">Password</label>
+            <div class="flex justify-between items-center mb-1">
+               <label class="form-label mb-0" for="login-password">Password</label>
+               <a href="#" class="forgot-link">Forgot?</a>
+            </div>
             <input
               v-model="password"
               type="password"
-              id="signup-password"
+              id="login-password"
               class="form-input"
-              placeholder="Min. 8 characters"
+              placeholder="••••••••"
               required
-              minlength="8"
             />
           </div>
 
           <div class="login-footer">
             <button type="submit" class="btn btn-primary w-full" :disabled="isLoading">
-              <span v-if="!isLoading">Create Free Account</span>
+              <span v-if="!isLoading">Sign In to Dashboard</span>
               <span v-else class="loader-sm"></span>
             </button>
           </div>
         </form>
 
         <div class="login-extra text-center mt-6">
-          <p class="text-sm text-muted">Already have an account? <RouterLink to="/login" class="gradient-text font-bold">Sign in</RouterLink></p>
+          <p class="text-sm text-muted">Don't have an account? <RouterLink to="/signup" class="gradient-text font-bold">Sign up</RouterLink></p>
         </div>
       </div>
     </div>
@@ -104,34 +76,27 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAuthStore } from '../stores/auth'
+import { useAuthStore } from '../../stores/auth'
 
 const router = useRouter()
 const authStore = useAuthStore()
 
-const role = ref('candidate')
-const name = ref('')
 const email = ref('')
 const password = ref('')
 const isLoading = ref(false)
 const errorMessage = ref('')
 
-async function handleSignup() {
+async function handleLogin() {
   isLoading.value = true
   errorMessage.value = ''
 
-  const result = await authStore.signup({
-    email: email.value,
-    password: password.value,
-    role: role.value,
-    name: name.value
-  })
+  const result = await authStore.login(email.value, password.value)
 
   isLoading.value = false
   if (result.success) {
     router.push('/dashboard')
   } else {
-    errorMessage.value = result.message || 'Signup failed'
+    errorMessage.value = result.message || 'Invalid credentials'
   }
 }
 </script>
@@ -217,6 +182,16 @@ async function handleSignup() {
   background: var(--clr-surface);
   color: var(--clr-primary);
   box-shadow: var(--shadow-sm);
+}
+
+.forgot-link {
+  font-size: 0.75rem;
+  color: var(--clr-primary);
+  text-decoration: none;
+}
+
+.forgot-link:hover {
+  text-decoration: underline;
 }
 
 .login-footer {
