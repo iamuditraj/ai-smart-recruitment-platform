@@ -31,7 +31,7 @@ const router = createRouter({
     {
       path: '/profile',
       name: 'profile',
-      component: () => import('../views/shared/ProfileView.vue'),
+      component: () => import('../views/shared/ProfileWrapper.vue'),
       meta: { title: 'My Profile — HireAI', requiresAuth: true },
     },
     {
