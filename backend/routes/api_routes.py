@@ -147,8 +147,8 @@ def save_resume():
     try:
         db = get_db()
         if not db:
-             return jsonify({"status": "error", "message": "Firebase not initialized"}), 500
-             
+            return jsonify({"status": "error", "message": "Firebase not initialized"}), 500
+            
         data = request.json
         resume_id = data.get('metadata', {}).get('resume_id')
         
@@ -652,7 +652,7 @@ def check_db():
     try:
         db = get_db()
         if not db:
-             return jsonify({"status": "error", "message": "Firebase not initialized. Did you add serviceAccountKey.json?"})
+            return jsonify({"status": "error", "message": "Firebase not initialized. Did you add serviceAccountKey.json?"})
         # Simple test to see if we can talk to Firestore
         return jsonify({"status": "success", "message": "Connected to Firestore!"})
     except Exception as e:
