@@ -483,8 +483,14 @@ def handle_jobs():
             response_data['posted_at'] = None # Or a placeholder string
             return jsonify({"status": "success", "message": "Job posted successfully!", "job": response_data})
         
-        else: # GET - Fetch all jobs
-            jobs_docs = db.collection('jobs').order_by('posted_at', direction=firestore.Query.DESCENDING).stream()
+        else: # GET - Fetch jobs
+            recruiter_email = request.args.get('recruiter_email')
+            if recruiter_email:
+                # Removed order_by here to avoid requiring a composite index in Firestore
+                jobs_docs = db.collection('jobs').where('recruiter_email', '==', recruiter_email).stream()
+            else:
+                jobs_docs = db.collection('jobs').order_by('posted_at', direction=firestore.Query.DESCENDING).stream()
+                
             jobs = []
             for doc in jobs_docs:
                 job = doc.to_dict()
@@ -492,11 +498,76 @@ def handle_jobs():
                 if 'posted_at' in job and job['posted_at']:
                     job['posted_at'] = job['posted_at'].isoformat()
                 jobs.append(job)
+                
+            # Sort manually if we didn't use Native Firestore sorting
+            if recruiter_email:
+                jobs.sort(key=lambda x: x.get('posted_at') or '', reverse=True)
+                
             return jsonify({"status": "success", "jobs": jobs})
 
     except Exception as e:
         print(f"Error in handle_jobs: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
+@api_bp.route('/api/jobs/<job_id>', methods=['PUT', 'DELETE', 'GET'])
+def handle_specific_job(job_id):
+    try:
+        db = get_db()
+        if not db:
+            return jsonify({"status": "error", "message": "Database not initialized"}), 500
+
+        job_ref = db.collection('jobs').document(job_id)
+        job_doc = job_ref.get()
+
+        if not job_doc.exists:
+            return jsonify({"status": "error", "message": "Job not found"}), 404
+
+        if request.method == 'GET':
+            job = job_doc.to_dict()
+            if 'posted_at' in job and job['posted_at']:
+                job['posted_at'] = job['posted_at'].isoformat()
+            return jsonify({"status": "success", "job": job})
+
+        if request.method == 'DELETE':
+            # Also optionally check if recruiter owns the job here
+            # recruiter_email = request.args.get('recruiter_email')
+            job_ref.delete()
+            return jsonify({"status": "success", "message": "Job deleted successfully"})
+
+        if request.method == 'PUT':
+            data = request.json
+            
+            # Fields that can be updated
+            update_data = {
+                "title": data.get('title'),
+                "company": data.get('company'),
+                "department": data.get('department'),
+                "location": data.get('location'),
+                "workArrangement": data.get('workArrangement'),
+                "type": data.get('type'),
+                "experienceLevel": data.get('experienceLevel'),
+                "salary": data.get('salary'),
+                "companyOverview": data.get('companyOverview'),
+                "jobSummary": data.get('jobSummary'),
+                "keyResponsibilities": data.get('keyResponsibilities'),
+                "requiredSkills": data.get('requiredSkills'),
+                "softSkills": data.get('softSkills'),
+                "educationalBackground": data.get('educationalBackground'),
+                "preferredQualifications": data.get('preferredQualifications'),
+                "applicationDeadline": data.get('applicationDeadline'),
+                "requiredDocumentsList": data.get('requiredDocumentsList'),
+            }
+            # Remove None values so we don't overwrite with nulls if a field is omitted
+            update_data = {k: v for k, v in update_data.items() if v is not None}
+            update_data['updated_at'] = firestore.SERVER_TIMESTAMP
+
+            job_ref.update(update_data)
+            return jsonify({"status": "success", "message": "Job updated successfully"})
+
+    except Exception as e:
+        print(f"Error in handle_specific_job: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 
 @api_bp.route('/api/jobs/apply', methods=['POST'])
 def apply_for_job():

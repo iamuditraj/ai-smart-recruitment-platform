@@ -5,12 +5,16 @@
         <button class="back-btn" @click="goBack">
           &larr; Back to Jobs
         </button>
-        <h1 class="page-title mt-4">Post a Hiring Request</h1>
-        <p class="page-subtitle">Publish a comprehensive job opportunity to attract top talent.</p>
+        <h1 class="page-title mt-4">{{ isEditMode ? 'Edit Hiring Request' : 'Post a Hiring Request' }}</h1>
+        <p class="page-subtitle">{{ isEditMode ? 'Update your job opportunity details.' : 'Publish a comprehensive job opportunity to attract top talent.' }}</p>
       </div>
 
       <div class="form-card card animate-fade-in-up" style="animation-delay: 0.1s">
-        <form @submit.prevent="submitJob" class="detailed-form">
+        <div v-if="isLoading" class="loading-state">
+          <div class="loader-sm"></div>
+          <p>Loading job details...</p>
+        </div>
+        <form v-else @submit.prevent="submitJob" class="detailed-form">
           <div v-if="message" :class="['message-banner', messageType]">
             {{ message }}
           </div>
@@ -145,7 +149,7 @@
           <!-- Submit -->
           <div class="submit-section mt-8">
             <button type="submit" class="btn btn-primary submit-btn" :disabled="isPosting">
-              <span v-if="!isPosting">Publish Job Posting</span>
+              <span v-if="!isPosting">{{ isEditMode ? 'Update Job Posting' : 'Publish Job Posting' }}</span>
               <span v-else class="loader-sm"></span>
             </button>
           </div>
@@ -157,16 +161,20 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 
 const authStore = useAuthStore()
 const router = useRouter()
+const route = useRoute()
 
 const isPosting = ref(false)
+const isLoading = ref(false)
 const message = ref('')
 const messageType = ref('success')
+
+const isEditMode = computed(() => !!route.params.id)
 
 const fallbackCompany = authStore.user?.companyName || authStore.user?.name || 'Recruiting Company'
 
@@ -197,16 +205,58 @@ function goBack() {
   router.push('/manage-jobs')
 }
 
+async function fetchJobDetails() {
+  isLoading.value = true
+  try {
+    const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/jobs/${route.params.id}`)
+    const data = await res.json()
+    if (data.status === 'success') {
+      const job = data.job
+      // Populate form data
+      Object.keys(formData.value).forEach(key => {
+        if (job[key] !== undefined) {
+          formData.value[key] = job[key]
+        }
+      })
+      // Map back required documents list to checkboxes
+      if (job.requiredDocumentsList && Array.isArray(job.requiredDocumentsList)) {
+        formData.value.reqResume = job.requiredDocumentsList.includes('Resume/CV')
+        formData.value.reqCoverLetter = job.requiredDocumentsList.includes('Cover Letter')
+        formData.value.reqPortfolio = job.requiredDocumentsList.includes('Portfolio')
+      }
+    } else {
+      message.value = 'Failed to load job details.'
+      messageType.value = 'error'
+    }
+  } catch (err) {
+    console.error('Fetch job error:', err)
+    message.value = 'Error loading job details.'
+    messageType.value = 'error'
+  } finally {
+    isLoading.value = false
+  }
+}
+
 onMounted(() => {
+  if (isEditMode.value) {
+    fetchJobDetails()
+  }
+
   if (!authStore.user) {
     authStore.refreshUser().then(() => {
-      formData.value.company = authStore.user?.companyName || authStore.user?.name || 'Recruiting Company'
-      formData.value.companyOverview = authStore.user?.companyDescription || ''
-      formData.value.recruiter_email = authStore.user?.email || ''
-      if (!formData.value.location && authStore.user?.location) {
-        formData.value.location = authStore.user.location
+      if (!isEditMode.value) { // Only set these defaults if NOT in edit mode
+        formData.value.company = authStore.user?.companyName || authStore.user?.name || 'Recruiting Company'
+        formData.value.companyOverview = authStore.user?.companyDescription || ''
+        formData.value.recruiter_email = authStore.user?.email || ''
+        if (!formData.value.location && authStore.user?.location) {
+          formData.value.location = authStore.user.location
+        }
       }
     })
+  } else if (!isEditMode.value) {
+    // Already have user and not in edit mode, ensure standard defaults just in case
+    formData.value.company = fallbackCompany
+    formData.value.recruiter_email = authStore.user.email
   }
 })
 
@@ -224,26 +274,31 @@ async function submitJob() {
   const payload = { ...formData.value, requiredDocumentsList: reqDocs }
 
   try {
-    const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/jobs`, {
-      method: 'POST',
+    const method = isEditMode.value ? 'PUT' : 'POST'
+    const url = isEditMode.value 
+      ? `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/jobs/${route.params.id}`
+      : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/jobs`
+
+    const res = await fetch(url, {
+      method: method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     })
     const data = await res.json()
     if (data.status === 'success') {
-      message.value = 'Job posted successfully! Redirecting...'
+      message.value = isEditMode.value ? 'Job updated successfully! Redirecting...' : 'Job posted successfully! Redirecting...'
       messageType.value = 'success'
       setTimeout(() => {
         router.push('/manage-jobs')
       }, 1500)
     } else {
-      message.value = data.message || 'Failed to post job'
+      message.value = data.message || (isEditMode.value ? 'Failed to update job' : 'Failed to post job')
       messageType.value = 'error'
       isPosting.value = false
     }
   } catch (err) {
-    console.error('Post job error:', err)
-    message.value = 'Network error while trying to post job.'
+    console.error('Submit job error:', err)
+    message.value = `Network error while trying to ${isEditMode.value ? 'update' : 'post'} job.`
     messageType.value = 'error'
     isPosting.value = false
   }
