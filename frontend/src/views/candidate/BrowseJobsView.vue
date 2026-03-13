@@ -58,7 +58,7 @@
             </div>
           </div>
 
-          <p class="job-description">{{ job.description }}</p>
+          <p class="job-description">{{ job.jobSummary || job.description }}</p>
 
           <div class="job-actions">
             <button

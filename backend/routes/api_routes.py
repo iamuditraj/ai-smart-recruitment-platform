@@ -452,18 +452,28 @@ def handle_jobs():
             recruiter_email = data.get('recruiter_email')
             
             if not all([title, company, recruiter_email]):
-                return jsonify({"status": "error", "message": "Missing required job fields"}), 400
+                return jsonify({"status": "error", "message": "Missing required job fields: title, company, or recruiter_email"}), 400
             
             job_ref = db.collection('jobs').document()
             job_data = {
                 "id": job_ref.id,
                 "title": title,
                 "company": company,
+                "department": data.get('department', ''),
                 "location": data.get('location', 'Remote'),
-                "type": data.get('type', 'Full-time'), # Job or Internship
+                "workArrangement": data.get('workArrangement', 'Remote'),
+                "type": data.get('type', 'Full-time'),
+                "experienceLevel": data.get('experienceLevel', 'Mid-Level'),
                 "salary": data.get('salary', 'Competitive'),
-                "description": data.get('description', ''),
-                "requirements": data.get('requirements', []),
+                "companyOverview": data.get('companyOverview', ''),
+                "jobSummary": data.get('jobSummary', ''),
+                "keyResponsibilities": data.get('keyResponsibilities', ''),
+                "requiredSkills": data.get('requiredSkills', ''),
+                "softSkills": data.get('softSkills', ''),
+                "educationalBackground": data.get('educationalBackground', ''),
+                "preferredQualifications": data.get('preferredQualifications', ''),
+                "applicationDeadline": data.get('applicationDeadline', ''),
+                "requiredDocumentsList": data.get('requiredDocumentsList', []),
                 "recruiter_email": recruiter_email,
                 "posted_at": firestore.SERVER_TIMESTAMP
             }
