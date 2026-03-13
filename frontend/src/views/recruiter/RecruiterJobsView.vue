@@ -26,8 +26,8 @@
           </div>
           <p class="job-description">{{ job.description }}</p>
           <div class="job-footer">
-            <button class="btn btn-ghost btn-sm">Edit</button>
-            <button class="btn btn-ghost btn-sm text-danger">Delete</button>
+            <router-link :to="`/edit-job/${job.id}`" class="btn btn-ghost btn-sm">Edit</router-link>
+            <button @click="deleteJob(job.id)" class="btn btn-ghost btn-sm text-danger">Delete</button>
           </div>
         </div>
       </div>
@@ -43,15 +43,39 @@ const authStore = useAuthStore()
 const jobs = ref([])
 
 async function fetchMyJobs() {
+  if (!authStore.user?.email) {
+    // Retry if user is not loaded yet
+    setTimeout(fetchMyJobs, 500)
+    return
+  }
+  
   try {
-    const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/jobs`)
+    const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/jobs?recruiter_email=${authStore.user.email}`)
     const data = await res.json()
     if (data.status === 'success') {
-      // Filter by current recruiter in real world we'd use a specific backend query
-      jobs.value = data.jobs.filter(j => j.recruiter_email === authStore.user?.email)
+      jobs.value = data.jobs
     }
   } catch (err) {
     console.error('Fetch my jobs error:', err)
+  }
+}
+
+async function deleteJob(jobId) {
+  if (!confirm('Are you sure you want to delete this job posting?')) return;
+  
+  try {
+    const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/jobs/${jobId}`, {
+      method: 'DELETE'
+    })
+    const data = await res.json()
+    if (data.status === 'success') {
+      jobs.value = jobs.value.filter(j => j.id !== jobId)
+    } else {
+      alert(data.message || 'Failed to delete job')
+    }
+  } catch (err) {
+    console.error('Delete job error:', err)
+    alert('An error occurred while deleting the job')
   }
 }
 

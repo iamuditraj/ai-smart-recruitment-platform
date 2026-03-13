@@ -81,6 +81,12 @@ const router = createRouter({
       meta: { title: 'Post Hiring Request — HireAI', requiresAuth: true, role: 'recruiter' },
     },
     {
+      path: '/edit-job/:id',
+      name: 'edit-job',
+      component: () => import('../views/recruiter/RecruiterPostJobView.vue'),
+      meta: { title: 'Edit Hiring Request — HireAI', requiresAuth: true, role: 'recruiter' },
+    },
+    {
       path: '/candidate-ranking',
       name: 'candidate-ranking',
       component: () => import('../views/recruiter/CandidatesView.vue'),
