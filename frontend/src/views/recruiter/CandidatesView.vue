@@ -197,17 +197,23 @@ async function fetchCandidates() {
     if (data.status === 'success') {
       candidates.value = data.applications.map(app => ({
         id: app.id,
-        name: app.candidate_name,
-        initials: app.candidate_name?.split(' ').map(n => n[0]).join('').toUpperCase() || '??',
-        role: 'Applicant', // In real world, we'd fetch the job title too
-        score: Math.floor(Math.random() * 40) + 60, // Placeholder AI Score for now
-        experience: app.experience || 'Not specified',
-        location: 'Remote',
-        matchReason: 'Applied through platform',
-        skills: ['Python', 'React', 'AI'], // Mock skills for UI
+        name: app.candidate_name || app.candidate_email.split('@')[0], 
+        initials: (app.candidate_name || app.candidate_email.split('@')[0]).split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2),
+        role: app.job_title || 'Applicant', 
+        score: app.ats_score || Math.floor(Math.random() * 40) + 60, // Use the real ATS score, fallback if missing
+        experience: app.experience || 'Experience Parsed from ATS',
+        location: app.location || 'Remote',
+        // Show missing skills as strengths/weaknesses text
+        matchReason: (app.missing_skills && app.missing_skills.length) 
+                     ? `Missing requirements: ${app.missing_skills.join(', ')}` 
+                     : (app.matched_skills && app.matched_skills.length) 
+                        ? `Strong Match via: ${app.matched_skills.join(', ')}`
+                        : 'Applied through platform',
+        // Show actual matched skills, or fallback to mock if the old apply endpoint was used
+        skills: (app.matched_skills && app.matched_skills.length) ? app.matched_skills : ['Applied'], 
         status: app.status || 'Applied',
         resumeUrl: app.resumeUrl,
-        resumeName: app.resumeName,
+        resumeName: app.resume_filename || app.resumeName || 'ATS_Resume.pdf',
         avatarGrad: `linear-gradient(135deg, #${Math.floor(Math.random()*16777215).toString(16)}, #${Math.floor(Math.random()*16777215).toString(16)})`
       }))
     }

@@ -61,13 +61,22 @@
           <p class="job-description">{{ job.jobSummary || job.description }}</p>
 
           <div class="job-actions">
+            <!-- If we are currently applying to this job, hide standard button and show file input -->
+            <div v-if="applyingTo === job.id" class="apply-upload-area">
+               <label class="btn btn-outline apply-upload-btn w-full">
+                 <span v-if="!isUploading">Select Resume (PDF/DOCX)</span>
+                 <span v-else class="loader-sm"></span>
+                 <input type="file" accept=".pdf,.docx,.doc" class="hidden-input" @change="(e) => finalizeApplication(e, job)" />
+               </label>
+               <button class="btn btn-text w-full mt-2 text-sm" @click="applyingTo = null" :disabled="isUploading">Cancel</button>
+            </div>
+            
             <button
-              @click="applyToJob(job)"
+              v-else
+              @click="initiateApply(job)"
               class="btn btn-primary w-full"
-              :disabled="applyingTo === job.id"
             >
-              <span v-if="applyingTo !== job.id">Apply Now</span>
-              <span v-else class="loader-sm"></span>
+              Apply Now
             </button>
           </div>
         </div>
@@ -93,6 +102,7 @@ const isLoading = ref(true)
 const searchQuery = ref('')
 const activeFilter = ref('All')
 const applyingTo = ref(null)
+const isUploading = ref(false)
 
 const toast = ref({ show: false, message: '', type: 'success' })
 
@@ -126,27 +136,40 @@ const filteredJobs = computed(() => {
   })
 })
 
-async function applyToJob(job) {
+function initiateApply(job) {
   applyingTo.value = job.id
+}
+
+async function finalizeApplication(event, job) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  isUploading.value = true;
+  
   try {
+    const formData = new FormData();
+    formData.append('resume', file);
+    formData.append('job_id', job.id);
+    formData.append('candidate_email', authStore.user?.email || '');
+
     const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/jobs/apply`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        job_id: job.id,
-        candidate_email: authStore.user?.email || ''
-      })
+      body: formData // Let the browser set the multi-part boundary headers automatically
     })
+    
     const data = await res.json()
     if (data.status === 'success') {
-      showToast('Successfully applied to ' + job.company)
+      showToast('Successfully applied! Your ATS score was computed.')
     } else {
-      showToast(data.message, 'error')
+      showToast(data.message || 'Failed to submit application', 'error')
     }
-  } catch {
+  } catch (err) {
+    console.error(err)
     showToast('Failed to apply. Check your connection.', 'error')
   } finally {
-    applyingTo.value = null
+    isUploading.value = false;
+    applyingTo.value = null;
+    event.target.value = ''; // Reset file input
   }
 }
 
@@ -237,6 +260,43 @@ onMounted(fetchJobs)
 }
 
 .w-full { width: 100%; }
+
+.hidden-input {
+  display: none;
+}
+
+.apply-upload-area {
+  display: flex;
+  flex-direction: column;
+  animation: fadeIn 0.3s ease;
+}
+
+.apply-upload-btn {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0.75rem 1rem;
+}
+
+.btn-text {
+  background: transparent;
+  color: var(--clr-text-muted);
+  border: none;
+}
+.btn-text:hover {
+  text-decoration: underline;
+  color: var(--clr-text);
+}
+.mt-2 { margin-top: 0.5rem; }
+.text-sm { font-size: 0.85rem; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 
 .jobs-loading { text-align: center; padding: 4rem; }
 .loader-lg {
