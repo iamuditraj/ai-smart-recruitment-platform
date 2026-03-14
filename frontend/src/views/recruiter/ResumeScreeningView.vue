@@ -85,6 +85,31 @@
                 <span v-for="skill in r.skills" :key="skill" class="skill-tag">{{ skill }}</span>
               </div>
               <span class="result-card__exp">{{ r.experience }}</span>
+
+              <!-- Score breakdown (shown if local ATS returned it) -->
+              <div v-if="r.score_breakdown && Object.keys(r.score_breakdown).length" class="result-breakdown">
+                <span class="breakdown-item">
+                  Skills <strong>{{ r.score_breakdown.required_skills ?? '—' }}/40</strong>
+                </span>
+                <span class="breakdown-sep">·</span>
+                <span class="breakdown-item">
+                  Exp <strong>{{ r.score_breakdown.experience_years ?? '—' }}/25</strong>
+                </span>
+                <span class="breakdown-sep">·</span>
+                <span class="breakdown-item">
+                  Preferred <strong>{{ r.score_breakdown.preferred_skills ?? '—' }}/20</strong>
+                </span>
+                <span class="breakdown-sep">·</span>
+                <span class="breakdown-item">
+                  Education <strong>{{ r.score_breakdown.education ?? '—' }}/15</strong>
+                </span>
+              </div>
+
+              <!-- Key gaps -->
+              <div v-if="r.key_gaps && r.key_gaps.length" class="result-gaps">
+                <span class="gaps-label">Missing:</span>
+                <span v-for="gap in r.key_gaps" :key="gap" class="gap-tag">{{ gap }}</span>
+              </div>
             </div>
             <div class="result-card__score">
               <div class="score-ring">
@@ -101,7 +126,7 @@
                   {{ r.score }}%
                 </span>
               </div>
-              <span class="score-ring__text">AI Score</span>
+              <span class="score-ring__text">ATS Score</span>
             </div>
           </div>
         </div>
@@ -392,6 +417,50 @@ async function analyze() {
 .score-ring__text {
   font-size: 0.72rem;
   color: var(--clr-text-muted);
+}
+
+.result-breakdown {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--clr-text-muted);
+}
+
+.breakdown-item strong {
+  color: var(--clr-text-light);
+  font-weight: 700;
+}
+
+.breakdown-sep {
+  color: var(--clr-border-hover);
+}
+
+.result-gaps {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.4rem;
+}
+
+.gaps-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--clr-danger, #ef4444);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.gap-tag {
+  font-size: 0.72rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: #fca5a5;
 }
 
 .loader-sm {

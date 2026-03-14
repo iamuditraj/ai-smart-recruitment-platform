@@ -8,6 +8,7 @@ import io
 import json
 import re
 import datetime
+from ats.scorer import score_resume
 
 api_bp = Blueprint('api', __name__)
 
@@ -168,85 +169,66 @@ def save_resume():
 @api_bp.route('/api/analyze', methods=['POST'])
 def analyze_resumes():
     try:
-        db = get_db() # Added to get Firestore access if needed
-        model = get_model()
-        if not model:
-            return jsonify({"status": "error", "message": "AI model not initialized"}), 500
+        db = get_db()
 
-        # 1. Get Job Description and Resumes
-        job_description = request.form.get('jobDescription', 'No JD provided')
+        job_description = request.form.get('jobDescription', '')
         resumes = request.files.getlist('resumes')
 
         if not resumes:
             return jsonify({"status": "error", "message": "No resumes uploaded"}), 400
 
+        if not job_description.strip():
+            return jsonify({"status": "error", "message": "Job description is required for ATS scoring"}), 400
+
         parsed_results = []
-        
+
         for file in resumes:
-            # 2. Extract Text from file
-            # Read into memory first to avoid file-system issues
             file_stream = io.BytesIO(file.read())
             extracted_text = extract_text(file_stream, file.filename)
-            
-            # 3. Prompt Gemini for matching
-            prompt = f"""
-            Task: Compare the following resume text against the Job Description (JD).
-            
-            JD: {job_description}
-            
-            Resume Text: {extracted_text}
-            
-            Respond STRICTLY with a JSON object containing:
-            - name: The candidate's name (found in resume, if not found use filename: {file.filename})
-            - score: A match percentage (0-100) based on JD requirements
-            - status: One of "Shortlist" (score >= 80), "Review" (60-79), or "Reject" (<60)
-            - badgeClass: One of "badge-success", "badge-warning", or "badge-danger" corresponding to status
-            - skills: Top 4 technical skills found in resume
-            - experience: A one-sentence summary (e.g., "5 years - Senior Dev at Google")
-            - category: The most fitting job domain for this resume, one of: INFORMATION-TECHNOLOGY, FINANCE, HEALTHCARE, ENGINEERING, BUSINESS-DEVELOPMENT, HR, SALES, MARKETING, EDUCATION, LEGAL, or OTHER
-            
-            JSON only, no additional talk.
-            """
-            
-            response = model.generate_content(prompt)
-            data = _clean_json_response(response.text)
-            
-            if data:
-                parsed_results.append(data)
 
-                # 4. Auto-save to Firestore candidate_profiles collection
-                if db:
-                    try:
-                        # Use sanitized filename as document ID
-                        doc_id = re.sub(r'[^\w]', '_', file.filename)
-                        db.collection('candidate_profiles').document(doc_id).set({
-                            **data,
-                            "source_file": file.filename,
-                            "job_description": job_description[:300],  # store first 300 chars of JD
-                            "analyzed_at": firestore.SERVER_TIMESTAMP
-                        })
-                    except Exception as save_err:
-                        print(f"Warning: Could not save to Firestore: {save_err}")
-            else:
-                # Fallback if AI fails to format JSON correctly
-                parsed_results.append({
-                    "name": file.filename,
-                    "score": 0,
-                    "status": "Error",
+            # ── Local ATS scoring — no Gemini ─────────────────────────────
+            try:
+                result = score_resume(extracted_text, job_description, filename=file.filename)
+            except Exception as score_err:
+                print(f"ATS scoring error for {file.filename}: {score_err}")
+                result = {
+                    "name":       file.filename,
+                    "score":      0,
+                    "status":     "Error",
                     "badgeClass": "badge-danger",
-                    "skills": [],
-                    "experience": "Could not parse analysis",
-                    "category": "OTHER"
-                })
+                    "skills":     [],
+                    "experience": "Could not parse resume",
+                    "category":   "OTHER",
+                    "score_breakdown": {},
+                    "matched_skills":  [],
+                    "key_gaps":        [],
+                }
 
-        # 4. Sort by score descending
+            parsed_results.append(result)
+
+            # Auto-save to Firestore
+            if db:
+                try:
+                    doc_id = re.sub(r'[^\w]', '_', file.filename)
+                    db.collection('candidate_profiles').document(doc_id).set({
+                        **result,
+                        "source_file":     file.filename,
+                        "job_description": job_description[:300],
+                        "analyzed_at":     firestore.SERVER_TIMESTAMP,
+                        "scoring_engine":  "local_ats_v1",
+                    })
+                except Exception as save_err:
+                    print(f"Warning: Could not save to Firestore: {save_err}")
+
         parsed_results.sort(key=lambda x: x.get('score', 0), reverse=True)
 
         return jsonify({
-            "status": "success",
+            "status":  "success",
             "message": f"Successfully analyzed {len(parsed_results)} resumes!",
-            "results": parsed_results
+            "results": parsed_results,
+            "engine":  "local_ats_v1",
         })
+
     except Exception as e:
         print(f"Error in analyze_resumes: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -573,30 +555,61 @@ def handle_specific_job(job_id):
 def apply_for_job():
     try:
         db = get_db()
-        data = request.json
-        job_id = data.get('job_id')
-        candidate_email = data.get('candidate_email')
         
-        if not all([job_id, candidate_email]):
-            return jsonify({"status": "error", "message": "Missing application fields"}), 400
+        # Now accepting multipart/form-data
+        job_id = request.form.get('job_id')
+        candidate_email = request.form.get('candidate_email')
+        resume_file = request.files.get('resume')
+        
+        if not all([job_id, candidate_email, resume_file]):
+            return jsonify({"status": "error", "message": "Missing application fields or resume file"}), 400
             
         # Check if already applied
         existing = db.collection('job_applications').where('job_id', '==', job_id).where('candidate_email', '==', candidate_email).get()
         if len(existing) > 0:
             return jsonify({"status": "error", "message": "You have already applied for this job"}), 400
             
+        # ── 1. Fetch Job Description for Scoring ─────────────────────────
+        job_doc = db.collection('jobs').document(job_id).get()
+        if not job_doc.exists:
+            return jsonify({"status": "error", "message": "Job not found"}), 404
+            
+        job_data = job_doc.to_dict()
+        # Fallback to jobSummary or description fields as the JD text
+        jd_text = job_data.get('jobSummary') or job_data.get('description') or ""
+        
+        # ── 2. Parse Resume and Score ────────────────────────────────────
+        file_stream = io.BytesIO(resume_file.read())
+        extracted_resume_text = extract_text(file_stream, resume_file.filename)
+        
+        ats_result = score_resume(extracted_resume_text, jd_text, filename=resume_file.filename)
+            
+        # ── 3. Save Application with ATS Data ────────────────────────────
         app_ref = db.collection('job_applications').document()
         app_data = {
             "id": app_ref.id,
             "job_id": job_id,
             "candidate_email": candidate_email,
             "status": "Applied",
-            "applied_at": firestore.SERVER_TIMESTAMP
+            "applied_at": firestore.SERVER_TIMESTAMP,
+            # Attach the ATS insights
+            "ats_score": ats_result.get("score", 0),
+            "ats_badge": ats_result.get("badgeClass", "badge-warning"),
+            "score_breakdown": ats_result.get("score_breakdown", {}),
+            "matched_skills": ats_result.get("matched_skills", []),
+            "missing_skills": ats_result.get("key_gaps", []),
+            "resume_filename": resume_file.filename
         }
         app_ref.set(app_data)
-        return jsonify({"status": "success", "message": "Applied successfully!"})
+        
+        return jsonify({
+            "status": "success", 
+            "message": "Applied successfully!",
+            "ats_score": app_data["ats_score"]
+        })
 
     except Exception as e:
+        print(f"Error applying for job: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @api_bp.route('/api/recruiter/applications', methods=['GET'])

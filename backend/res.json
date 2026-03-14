@@ -1,0 +1,34 @@
+{
+  "engine": "local_ats_v1",
+  "message": "Successfully analyzed 1 resumes!",
+  "results": [
+    {
+      "badgeClass": "badge-success",
+      "category": "INFORMATION-TECHNOLOGY",
+      "experience": "5 years experience",
+      "key_gaps": [],
+      "matched_skills": [
+        "docker",
+        "flask",
+        "postgresql",
+        "python"
+      ],
+      "name": "Jane Doe",
+      "score": 100,
+      "score_breakdown": {
+        "education": 15,
+        "experience_years": 25,
+        "preferred_skills": 20,
+        "required_skills": 40
+      },
+      "skills": [
+        "docker",
+        "flask",
+        "postgresql",
+        "python"
+      ],
+      "status": "Shortlist"
+    }
+  ],
+  "status": "success"
+}
