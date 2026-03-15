@@ -1,0 +1,21 @@
+# Auto-resolve package-lock.json merge conflicts by accepting the current version
+# Team members should run `npm install` after pulling to regenerate it
+frontend/package-lock.json merge=ours
+
+# Ensure consistent line endings across all platforms
+* text=auto
+*.js text eol=lf
+*.vue text eol=lf
+*.py text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+
+# Mark binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary

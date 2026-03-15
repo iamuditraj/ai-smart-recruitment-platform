@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 venv/
+.venv/
+ml_model/.venv/
+ml_model/datasets/
 .env
 
 # Firebase
@@ -12,6 +15,7 @@ serviceAccountKey.json
 
 # Node.js
 node_modules/
+package-lock.json
 dist/
 dist-ssr/
 *.local

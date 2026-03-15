@@ -1,0 +1,10 @@
+
+Candidate Name: John Doe
+Email: candidev@example.com
+Summary: Full Stack Developer with 4 years of experience building web applications.
+Skills: React, Node.js, Express, PostgreSQL, JavaScript, Python
+Experience:
+- Software Engineer at Tech Corp (4+ years of professional experience)
+  - Built microservices in Node.js and user interfaces in React.
+  - Managed a PostgreSQL database.
+Education: Bachelor's degree in Computer Science
