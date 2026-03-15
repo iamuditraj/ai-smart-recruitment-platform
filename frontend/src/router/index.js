@@ -41,7 +41,7 @@ const router = createRouter({
       meta: { title: 'Dashboard — HireAI', requiresAuth: true },
     },
 
-    // ── Candidate Routes ──────────────────────────────────────────────────────
+    // Candidate Routes
     {
       path: '/jobs',
       name: 'jobs',
@@ -67,7 +67,7 @@ const router = createRouter({
       meta: { title: 'AI Mock Interview — HireAI', requiresAuth: true, role: 'candidate' },
     },
 
-    // ── Recruiter Routes ──────────────────────────────────────────────────────
+    // Recruiter Routes
     {
       path: '/manage-jobs',
       name: 'manage-jobs',
@@ -99,6 +99,7 @@ const router = createRouter({
       meta: { title: 'Resume Screening — HireAI', requiresAuth: true, role: 'recruiter' },
     },
   ],
+
   scrollBehavior() {
     return { top: 0, behavior: 'smooth' }
   },
@@ -108,15 +109,12 @@ const router = createRouter({
 router.beforeEach((to) => {
   const auth = useAuthStore()
 
-  // Update page title
   document.title = to.meta?.title || 'HireAI — Smart Recruitment Platform'
 
-  // Check if route requires auth
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     return { name: 'login' }
   }
 
-  // Check role-based access
   if (to.meta.role && auth.role !== to.meta.role) {
     return { name: 'dashboard' }
   }
