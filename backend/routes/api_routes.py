@@ -551,6 +551,38 @@ def handle_specific_job(job_id):
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+@api_bp.route('/api/jobs/preview_score', methods=['POST'])
+def preview_score():
+    try:
+        db = get_db()
+        job_id = request.form.get('job_id')
+        resume_file = request.files.get('resume')
+        
+        if not all([job_id, resume_file]):
+            return jsonify({"status": "error", "message": "Missing job_id or resume file"}), 400
+            
+        job_doc = db.collection('jobs').document(job_id).get()
+        if not job_doc.exists:
+            return jsonify({"status": "error", "message": "Job not found"}), 404
+            
+        job_data = job_doc.to_dict()
+        jd_text = job_data.get('jobSummary') or job_data.get('description') or ""
+        
+        file_stream = io.BytesIO(resume_file.read())
+        extracted_resume_text = extract_text(file_stream, resume_file.filename)
+        
+        ats_result = score_resume(extracted_resume_text, jd_text, filename=resume_file.filename)
+        
+        return jsonify({
+            "status": "success",
+            "message": "Preview generated successfully!",
+            "ats_result": ats_result
+        })
+    except Exception as e:
+        print(f"Error previewing score: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 @api_bp.route('/api/jobs/apply', methods=['POST'])
 def apply_for_job():
     try:
@@ -579,10 +611,20 @@ def apply_for_job():
         jd_text = job_data.get('jobSummary') or job_data.get('description') or ""
         
         # ── 2. Parse Resume and Score ────────────────────────────────────
-        file_stream = io.BytesIO(resume_file.read())
-        extracted_resume_text = extract_text(file_stream, resume_file.filename)
-        
-        ats_result = score_resume(extracted_resume_text, jd_text, filename=resume_file.filename)
+        pre_ats_result_raw = request.form.get('ats_result')
+        if pre_ats_result_raw:
+            try:
+                ats_result = json.loads(pre_ats_result_raw)
+            except Exception as parse_e:
+                print(f"Error parsing precomputed ATS data: {parse_e}")
+                ats_result = None
+        else:
+            ats_result = None
+
+        if not ats_result:
+            file_stream = io.BytesIO(resume_file.read())
+            extracted_resume_text = extract_text(file_stream, resume_file.filename)
+            ats_result = score_resume(extracted_resume_text, jd_text, filename=resume_file.filename)
             
         # ── 3. Save Application with ATS Data ────────────────────────────
         app_ref = db.collection('job_applications').document()

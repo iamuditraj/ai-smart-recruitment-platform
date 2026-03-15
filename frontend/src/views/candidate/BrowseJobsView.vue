@@ -61,18 +61,7 @@
           <p class="job-description">{{ job.jobSummary || job.description }}</p>
 
           <div class="job-actions">
-            <!-- If we are currently applying to this job, hide standard button and show file input -->
-            <div v-if="applyingTo === job.id" class="apply-upload-area">
-               <label class="btn btn-outline apply-upload-btn w-full">
-                 <span v-if="!isUploading">Select Resume (PDF/DOCX)</span>
-                 <span v-else class="loader-sm"></span>
-                 <input type="file" accept=".pdf,.docx,.doc" class="hidden-input" @change="(e) => finalizeApplication(e, job)" />
-               </label>
-               <button class="btn btn-text w-full mt-2 text-sm" @click="applyingTo = null" :disabled="isUploading">Cancel</button>
-            </div>
-            
             <button
-              v-else
               @click="initiateApply(job)"
               class="btn btn-primary w-full"
             >
@@ -82,6 +71,90 @@
         </div>
       </div>
     </div>
+
+    <!-- Pre-Application Modal Overlay -->
+    <Transition name="fade">
+      <div v-if="selectedJobForApply" class="modal-overlay" @click.self="closeApplyModal">
+        <div class="modal-content apply-modal">
+          <button class="modal-close" @click="closeApplyModal">&times;</button>
+          
+          <div class="modal-split">
+            <!-- Left Pane: Job Info -->
+            <div class="modal-pane job-info-pane">
+              <h2 class="job-title-modal">{{ selectedJobForApply.title }}</h2>
+              <p class="subtitle">{{ selectedJobForApply.company }} &bull; {{ selectedJobForApply.location }}</p>
+              
+              <div class="info-badges mt-2">
+                <span class="badge">{{ selectedJobForApply.type }}</span>
+                <span class="badge" v-if="selectedJobForApply.salary">{{ selectedJobForApply.salary }}</span>
+              </div>
+              
+              <div class="mt-4 job-desc">
+                <h4>Job Description</h4>
+                <p>{{ selectedJobForApply.jobSummary || selectedJobForApply.description }}</p>
+                <div v-if="selectedJobForApply.requiredSkills">
+                  <h4 class="mt-4">Requirements</h4>
+                  <p>{{ selectedJobForApply.requiredSkills }}</p>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Right Pane: Upload/Preview -->
+            <div class="modal-pane action-pane">
+              <h3 class="font-bold mb-4" style="font-size: 1.25rem;">Application Preview</h3>
+              
+              <div v-if="!previewResult && !isPreviewing" class="upload-dropzone">
+                 <p class="mb-4 text-center">Upload your resume to see your ATS score before applying.</p>
+                 <label class="btn btn-outline apply-upload-btn w-full">
+                   <span>Select Resume (PDF/DOCX)</span>
+                   <input type="file" accept=".pdf,.docx,.doc" class="hidden-input" @change="handlePreviewUpload" />
+                 </label>
+              </div>
+              
+              <div v-else-if="isPreviewing" class="scanning-state text-center">
+                 <div class="scanner"></div>
+                 <p class="mt-4 text-primary font-bold">Scanning against ATS...</p>
+                 <p class="text-sm text-muted mt-2">Parsing skills and experience.</p>
+              </div>
+              
+              <div v-else-if="previewResult" class="preview-results">
+                 <!-- ATS Summary Card -->
+                 <div class="ats-card card mb-4">
+                   <div class="flex justify-between items-center mb-2">
+                     <h4 class="font-bold">ATS Match Score</h4>
+                     <span :class="['badge', previewResult.badgeClass]">{{ previewResult.score }} / 100</span>
+                   </div>
+                   
+                   <div class="mb-4">
+                     <p class="text-sm font-semibold mb-2">Matched Skills</p>
+                     <div class="flex flex-wrap gap-1">
+                       <span v-for="skill in (previewResult.matched_skills || []).slice(0, 5)" :key="skill" class="skill-tag match">{{ skill }}</span>
+                       <span v-if="(previewResult.matched_skills?.length || 0) > 5" class="skill-tag text-xs">+{{ previewResult.matched_skills.length - 5 }} more</span>
+                     </div>
+                   </div>
+                   
+                   <div v-if="previewResult.key_gaps?.length" class="mb-2">
+                     <p class="text-sm font-semibold mb-2 mt-3">Missing Keywords</p>
+                     <div class="flex flex-wrap gap-1">
+                       <span v-for="gap in previewResult.key_gaps.slice(0, 5)" :key="gap" class="skill-tag gap">{{ gap }}</span>
+                     </div>
+                   </div>
+                 </div>
+                 
+                 <div class="submission-confirmation bg-surface card p-4">
+                   <p class="mb-4 text-sm font-semibold text-center">Do you want to submit this application?</p>
+                   <button class="btn btn-primary w-full" @click="submitFinalApplication" :disabled="isSubmitting">
+                     <span v-if="!isSubmitting">Submit Official Application</span>
+                     <span v-else class="loader-sm"></span>
+                   </button>
+                   <button class="btn btn-text w-full mt-2" @click="resetPreview" :disabled="isSubmitting">Upload Different Resume</button>
+                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Transition>
 
     <!-- Notification -->
     <Transition name="fade">
@@ -101,8 +174,11 @@ const jobs = ref([])
 const isLoading = ref(true)
 const searchQuery = ref('')
 const activeFilter = ref('All')
-const applyingTo = ref(null)
-const isUploading = ref(false)
+const selectedJobForApply = ref(null)
+const selectedResumeFile = ref(null)
+const previewResult = ref(null)
+const isPreviewing = ref(false)
+const isSubmitting = ref(false)
 
 const toast = ref({ show: false, message: '', type: 'success' })
 
@@ -137,29 +213,80 @@ const filteredJobs = computed(() => {
 })
 
 function initiateApply(job) {
-  applyingTo.value = job.id
+  selectedJobForApply.value = job
+  selectedResumeFile.value = null
+  previewResult.value = null
+  isPreviewing.value = false
+  isSubmitting.value = false
 }
 
-async function finalizeApplication(event, job) {
+function closeApplyModal() {
+  if (isSubmitting.value || isPreviewing.value) return
+  selectedJobForApply.value = null
+}
+
+function resetPreview() {
+  previewResult.value = null
+  selectedResumeFile.value = null
+}
+
+async function handlePreviewUpload(event) {
   const file = event.target.files[0];
   if (!file) return;
 
-  isUploading.value = true;
+  selectedResumeFile.value = file;
+  isPreviewing.value = true;
   
   try {
     const formData = new FormData();
     formData.append('resume', file);
-    formData.append('job_id', job.id);
-    formData.append('candidate_email', authStore.user?.email || '');
+    formData.append('job_id', selectedJobForApply.value.id);
 
-    const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/jobs/apply`, {
+    const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/jobs/preview_score`, {
       method: 'POST',
-      body: formData // Let the browser set the multi-part boundary headers automatically
+      body: formData
     })
     
     const data = await res.json()
     if (data.status === 'success') {
-      showToast('Successfully applied! Your ATS score was computed.')
+      previewResult.value = data.ats_result
+    } else {
+      showToast(data.message || 'Failed to generate preview', 'error')
+      selectedResumeFile.value = null
+    }
+  } catch (err) {
+    console.error(err)
+    showToast('Failed to connect to server.', 'error')
+    selectedResumeFile.value = null
+  } finally {
+    isPreviewing.value = false;
+    event.target.value = ''; // Reset file input
+  }
+}
+
+async function submitFinalApplication() {
+  if (!selectedResumeFile.value || !selectedJobForApply.value) return;
+
+  isSubmitting.value = true;
+  
+  try {
+    const formData = new FormData();
+    formData.append('resume', selectedResumeFile.value);
+    formData.append('job_id', selectedJobForApply.value.id);
+    formData.append('candidate_email', authStore.user?.email || '');
+    if (previewResult.value) {
+      formData.append('ats_result', JSON.stringify(previewResult.value));
+    }
+
+    const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/jobs/apply`, {
+      method: 'POST',
+      body: formData
+    })
+    
+    const data = await res.json()
+    if (data.status === 'success') {
+      showToast('Successfully applied! Your ATS score was saved.')
+      closeApplyModal()
     } else {
       showToast(data.message || 'Failed to submit application', 'error')
     }
@@ -167,9 +294,7 @@ async function finalizeApplication(event, job) {
     console.error(err)
     showToast('Failed to apply. Check your connection.', 'error')
   } finally {
-    isUploading.value = false;
-    applyingTo.value = null;
-    event.target.value = ''; // Reset file input
+    isSubmitting.value = false;
   }
 }
 
@@ -265,12 +390,6 @@ onMounted(fetchJobs)
   display: none;
 }
 
-.apply-upload-area {
-  display: flex;
-  flex-direction: column;
-  animation: fadeIn 0.3s ease;
-}
-
 .apply-upload-btn {
   position: relative;
   overflow: hidden;
@@ -285,6 +404,7 @@ onMounted(fetchJobs)
   background: transparent;
   color: var(--clr-text-muted);
   border: none;
+  cursor: pointer;
 }
 .btn-text:hover {
   text-decoration: underline;
@@ -293,10 +413,158 @@ onMounted(fetchJobs)
 .mt-2 { margin-top: 0.5rem; }
 .text-sm { font-size: 0.85rem; }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-5px); }
-  to { opacity: 1; transform: translateY(0); }
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
 }
+
+.modal-content.apply-modal {
+  background: var(--clr-bg);
+  width: 90%;
+  max-width: 900px;
+  height: 80vh;
+  border-radius: var(--radius-lg);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-xl);
+  overflow: hidden;
+}
+
+.modal-close {
+  position: absolute;
+  top: 1rem; right: 1.5rem;
+  background: transparent;
+  border: none;
+  font-size: 2rem;
+  color: var(--clr-text-muted);
+  cursor: pointer;
+  z-index: 10;
+}
+.modal-close:hover { color: var(--clr-text); }
+
+.modal-split {
+  display: flex;
+  flex-direction: row;
+  height: 100%;
+  overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  .modal-split {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+}
+
+.modal-pane {
+  flex: 1;
+  padding: 2.5rem;
+  overflow-y: auto;
+}
+
+.job-info-pane {
+  border-right: 1px solid var(--clr-border);
+  background: var(--clr-surface);
+}
+
+.job-title-modal { font-size: 1.5rem; font-weight: 800; color: var(--clr-text); margin-bottom: 0.25rem; }
+.subtitle { color: var(--clr-text-muted); font-size: 0.95rem; margin-bottom: 0.75rem; }
+
+.action-pane {
+  background: var(--clr-bg);
+  display: flex;
+  flex-direction: column;
+}
+
+.info-badges { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: var(--clr-surface-2);
+  color: var(--clr-text);
+}
+.badge.badge-success { background: rgba(16, 185, 129, 0.2); color: #10B981; }
+.badge.badge-warning { background: rgba(245, 158, 11, 0.2); color: #F59E0B; }
+.badge.badge-danger { background: rgba(239, 68, 68, 0.2); color: #EF4444; }
+
+.job-desc {
+  font-size: 0.95rem;
+  color: var(--clr-text-muted);
+  line-height: 1.6;
+}
+.job-desc h4 { color: var(--clr-text); font-weight: 700; margin-bottom: 0.5rem; }
+
+.upload-dropzone {
+  border: 2px dashed var(--clr-border);
+  border-radius: var(--radius-md);
+  padding: 3rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--clr-surface);
+  transition: border-color 0.2s;
+}
+.upload-dropzone:hover { border-color: var(--clr-primary); }
+
+.scanner {
+  width: 100%;
+  height: 8px;
+  background: var(--clr-surface-2);
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+  margin-top: 2rem;
+}
+.scanner::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; height: 100%;
+  width: 30%;
+  background: var(--clr-primary);
+  animation: scan 1.5s infinite ease-in-out;
+}
+@keyframes scan {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(330%); }
+  100% { transform: translateX(-100%); }
+}
+
+.skill-tag {
+  background: var(--clr-surface-2);
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+}
+.skill-tag.match { background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid rgba(16, 185, 129, 0.3); }
+.skill-tag.gap { background: rgba(239, 68, 68, 0.15); color: #EF4444; border: 1px solid rgba(239, 68, 68, 0.3); }
+
+.flex { display: flex; }
+.justify-between { justify-content: space-between; }
+.items-center { align-items: center; }
+.gap-1 { gap: 0.25rem; }
+.flex-wrap { flex-wrap: wrap; }
+.mb-1 { margin-bottom: 0.25rem; }
+.mb-2 { margin-bottom: 0.5rem; }
+.mb-4 { margin-bottom: 1rem; }
+.mt-3 { margin-top: 0.75rem; }
+.mt-4 { margin-top: 1rem; }
+.text-center { text-align: center; }
+.font-bold { font-weight: 700; }
+.font-semibold { font-weight: 600; }
+.text-primary { color: var(--clr-primary); }
+.p-4 { padding: 1rem; }
+.bg-surface { background: var(--clr-surface); }
 
 .jobs-loading { text-align: center; padding: 4rem; }
 .loader-lg {
