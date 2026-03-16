@@ -69,14 +69,43 @@ def _extract_name(text: str) -> str:
     return "Unknown"
 
 
-def score_resume(resume_text: str, jd_text: str, filename: str = "") -> Dict[str, Any]:
+def score_resume(
+    resume_text: str,
+    jd_text: str,
+    filename: str = "",
+    structured_jd: Dict[str, str] | None = None,
+) -> Dict[str, Any]:
     """
     Score a single resume against a job description.
+
+    Args:
+        resume_text:    Raw text extracted from the candidate's resume.
+        jd_text:        Base job description text (e.g. jobSummary).
+        filename:       Original resume filename (used as name fallback).
+        structured_jd:  Optional dict with recruiter-filled fields:
+                        requiredSkills, keyResponsibilities,
+                        preferredQualifications, educationalBackground.
+                        These are prepended to jd_text so the parser can
+                        extract skills from all available job data.
 
     Returns a dict matching the existing API response shape:
       name, score, status, badgeClass, skills, experience,
       category, score_breakdown, matched_skills, key_gaps
     """
+    # ── Build full JD text from all available fields ──────────────────────
+    if structured_jd:
+        sections = []
+        if structured_jd.get("requiredSkills"):
+            sections.append(f"Required Skills: {structured_jd['requiredSkills']}")
+        if structured_jd.get("keyResponsibilities"):
+            sections.append(f"Key Responsibilities: {structured_jd['keyResponsibilities']}")
+        if structured_jd.get("preferredQualifications"):
+            sections.append(f"Preferred Qualifications: {structured_jd['preferredQualifications']}")
+        if structured_jd.get("educationalBackground"):
+            sections.append(f"Educational Background: {structured_jd['educationalBackground']}")
+        if sections:
+            jd_text = "\n".join(sections) + "\n\n" + jd_text
+
     jd = parse_jd(jd_text)
     resume_skills: Set[str] = set(extract_skills(resume_text))
 
