@@ -48,6 +48,11 @@ const uiStore = useUIStore()
 const route = useRoute()
 
 const currentPageTitle = computed(() => {
+  // Prefer the human-readable meta.title, strip the " — HireAI" suffix
+  if (route.meta?.title) {
+    return route.meta.title.replace(/\s*—.*$/, '')
+  }
+  // Fall back to transforming the route name
   const name = route.name || 'Dashboard'
   return name.toString()
     .split('-')

@@ -1,14 +1,14 @@
-from flask import Blueprint, jsonify, request
-from services.firebase_service import get_db
-from services.ai_service import get_model
-from services.parser_service import extract_text
-from firebase_admin import firestore
-from werkzeug.security import generate_password_hash, check_password_hash
+from flask import Blueprint, jsonify, request  # pyre-ignore[21]
+from services.firebase_service import get_db  # pyre-ignore[21]
+from services.ai_service import get_model  # pyre-ignore[21]
+from services.parser_service import extract_text  # pyre-ignore[21]
+from firebase_admin import firestore  # pyre-ignore[21]
+from werkzeug.security import generate_password_hash, check_password_hash  # pyre-ignore[21]
 import io
 import json
 import re
 import datetime
-from ats.scorer import score_resume
+from services.ats.scorer import score_resume  # pyre-ignore[21]
 
 api_bp = Blueprint('api', __name__)
 
@@ -50,16 +50,18 @@ def signup():
         if not db:
             return jsonify({"status": "error", "message": "Database not initialized"}), 500
 
-        # Check if user exists
-        user_ref = db.collection('users').document(email)
-        user_doc = user_ref.get()
+        # Check if user exists in either collection
+        candidate_doc = db.collection('candidates').document(email).get()
+        recruiter_doc = db.collection('recruiters').document(email).get()
 
-        if user_doc.exists:
+        if candidate_doc.exists or recruiter_doc.exists:
             return jsonify({"status": "error", "message": "User already exists"}), 400
 
-        # Create user
+        # Create user in the appropriate collection based on role
         hashed_password = generate_password_hash(password)
-        db.collection('users').document(email).set({
+        collection_name = 'recruiters' if role == 'recruiter' else 'candidates'
+        
+        db.collection(collection_name).document(email).set({
             'email': email,
             'password': hashed_password,
             'role': role,
@@ -94,9 +96,10 @@ def login():
         if not db:
             return jsonify({"status": "error", "message": "Database not initialized"}), 500
 
-        # Get user
-        user_ref = db.collection('users').document(email)
-        user_doc = user_ref.get()
+        # Get user (check both collections)
+        user_doc = db.collection('candidates').document(email).get()
+        if not user_doc.exists:
+            user_doc = db.collection('recruiters').document(email).get()
 
         if not user_doc.exists:
             return jsonify({"status": "error", "message": "Invalid email or password"}), 401
@@ -159,11 +162,42 @@ def save_resume():
         # Save to 'resumes' collection
         db.collection('resumes').document(resume_id).set(data)
         
+        # Also link it to the candidate's multiple resumes array if email exists
+        email = data.get('profile', {}).get('contact', {}).get('email')
+        if email:
+            candidate_ref = db.collection('candidates').document(email)
+            doc_snap = candidate_ref.get()
+            if doc_snap.exists:
+                user_data = doc_snap.to_dict()
+                resumes = user_data.get('resumes', [])
+                
+                is_default = len(resumes) == 0
+                
+                new_resume = {
+                    'id': resume_id,
+                    'resume_id': resume_id,
+                    'type': 'generated',
+                    'resumeName': f"Generated Resume - {data.get('profile', {}).get('job_title', 'Role')}",
+                    'parsedResume': data,
+                    'isDefault': is_default,
+                    'uploadedAt': datetime.datetime.utcnow().isoformat()
+                }
+                
+                update_data = {
+                    'resumes': firestore.ArrayUnion([new_resume]),
+                    'updatedAt': firestore.SERVER_TIMESTAMP
+                }
+                if is_default:
+                    update_data['defaultResumeId'] = resume_id
+                    
+                candidate_ref.update(update_data)
+        
         return jsonify({
             "status": "success",
             "message": f"Resume {resume_id} saved successfully to Firestore!"
         })
     except Exception as e:
+        print(f"Error in save_resume: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @api_bp.route('/api/analyze', methods=['POST'])
@@ -288,8 +322,9 @@ def handle_profile():
             if not email:
                 return jsonify({"status": "error", "message": "Email is required"}), 400
             
-            # Simple profile update (merge data)
-            user_ref = db.collection('users').document(email)
+            # Determine which collection to update
+            collection_name = 'recruiters' if data.get('role') == 'recruiter' else 'candidates'
+            user_ref = db.collection(collection_name).document(email)
             user_ref.update(data)
             
             # Get updated data
@@ -309,7 +344,11 @@ def handle_profile():
             if not email:
                 return jsonify({"status": "error", "message": "Email is required"}), 400
                 
-            user_doc = db.collection('users').document(email).get()
+            # Check both collections
+            user_doc = db.collection('candidates').document(email).get()
+            if not user_doc.exists:
+                user_doc = db.collection('recruiters').document(email).get()
+                
             if not user_doc.exists:
                 return jsonify({"status": "error", "message": "User not found"}), 404
                 
@@ -397,14 +436,38 @@ Resume Text:
             parsed_resume = None
         # --- End parse ---
 
-        # Update user profile in Firestore
-        user_ref = db.collection('users').document(email)
-        user_ref.update({
+        # Update candidate profile in Firestore (only candidates upload resumes here)
+        user_ref = db.collection('candidates').document(email)
+        user_snap = user_ref.get()
+        user_data = user_snap.to_dict() if user_snap.exists else {}
+        resumes = user_data.get('resumes', [])
+        
+        is_default = len(resumes) == 0
+        resume_id = str(datetime.datetime.utcnow().timestamp()).replace('.', '')
+        
+        new_resume = {
+            'id': resume_id,
             'resumeUrl': resume_data_uri,
             'resumeName': file.filename,
+            'type': 'uploaded',
             'parsedResume': parsed_resume,
+            'isDefault': is_default,
+            'uploadedAt': datetime.datetime.utcnow().isoformat()
+        }
+        
+        update_data = {
+            'resumes': firestore.ArrayUnion([new_resume]),
             'updatedAt': firestore.SERVER_TIMESTAMP
-        })
+        }
+        
+        if is_default:
+            update_data['defaultResumeId'] = resume_id
+            update_data['resumeUrl'] = resume_data_uri
+            update_data['resumeName'] = file.filename
+            if parsed_resume:
+                update_data['parsedResume'] = parsed_resume
+            
+        user_ref.update(update_data)
 
         return jsonify({
             "status": "success",
@@ -418,6 +481,66 @@ Resume Text:
         import traceback
         print(f"Error in upload_resume: {e}")
         traceback.print_exc()
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@api_bp.route('/api/profile/set-default-resume', methods=['POST'])
+def set_default_resume():
+    try:
+        db = get_db()
+        data = request.json
+        email = data.get('email')
+        resume_id = data.get('resume_id')
+        
+        if not email or not resume_id:
+            return jsonify({"status": "error", "message": "Email and resume_id are required"}), 400
+            
+        user_ref = db.collection('candidates').document(email)
+        doc = user_ref.get()
+        
+        if not doc.exists:
+            return jsonify({"status": "error", "message": "User not found"}), 404
+            
+        user_data = doc.to_dict()
+        resumes = user_data.get('resumes', [])
+        
+        matched_resume = None
+        for r in resumes:
+            is_match = (
+                str(r.get('id', '')) == str(resume_id) or
+                str(r.get('resume_id', '')) == str(resume_id) or
+                str(r.get('uploadedAt', '')) == str(resume_id)  # fallback for legacy resumes
+            )
+            r['isDefault'] = is_match
+            if is_match:
+                matched_resume = r
+
+        if not matched_resume:
+            return jsonify({"status": "error", "message": "Resume not found in your profile"}), 404
+
+        assert matched_resume is not None  # type narrowing: already guarded above
+
+        update_data = {
+            'resumes': resumes,
+            'defaultResumeId': resume_id,
+            'resumeName': matched_resume.get('resumeName', 'Default Resume'),
+            'updatedAt': firestore.SERVER_TIMESTAMP
+        }
+
+        resume_url = matched_resume.get('resumeUrl')
+        if resume_url:
+            update_data['resumeUrl'] = resume_url
+
+        parsed = matched_resume.get('parsedResume')
+        if parsed:
+            update_data['parsedResume'] = parsed
+
+        user_ref.update(update_data)
+
+        return jsonify({"status": "success", "message": "Default resume updated successfully!"})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"Error in set_default_resume: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @api_bp.route('/api/jobs', methods=['GET', 'POST'])
@@ -680,7 +803,7 @@ def get_recruiter_applications():
                 
                 # Fetch candidate profile to get name and resume
                 c_email = app_data.get('candidate_email')
-                user_doc = db.collection('users').document(c_email).get()
+                user_doc = db.collection('candidates').document(c_email).get()
                 if user_doc.exists:
                     user_data = user_doc.to_dict()
                     app_data['candidate_name'] = user_data.get('name', 'Unknown')

@@ -102,6 +102,9 @@
         <div class="rg-preview-panel">
           <div class="rg-preview-header">
             <span class="rg-preview-label">Live Preview (Minimal)</span>
+            <span v-if="isGenerating" class="rg-ai-indicator">
+              <span class="rg-ai-dot"></span> AI generating…
+            </span>
           </div>
 
           <!-- Scaled Resume Preview -->
@@ -128,7 +131,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useResumeStore } from '../../stores/resume.js'
 import { useResumeWizard } from '../../composables/useResumeWizard.js'
 import { useResumeAI } from '../../composables/useResumeAI.js'
@@ -151,17 +154,34 @@ const { isGenerating } = useResumeAI()
 const previewScale = ref(0.5)
 
 function computePreviewScale() {
-  const wrapperEl = document.querySelector('.rg-preview-scale-outer')
-  if (!wrapperEl) return
-  const availWidth = wrapperEl.clientWidth - 16
-  previewScale.value = Math.min(availWidth / 794, 0.7)
+  const wrapperEl = document.getElementById('rg-preview-wrapper')
+  const innerEl = document.querySelector('.rg-preview-scale-inner')
+  if (!wrapperEl || !innerEl) return
+  
+  const availWidth = wrapperEl.clientWidth
+  if (availWidth === 0) return
+
+  const scale = Math.min(availWidth / 794, 0.7)
+  previewScale.value = scale
+  
+  // Force the wrapper height to match the scaled height of the content
+  // This removes "ghost space" below the scaled element.
+  nextTick(() => {
+    const rect = innerEl.getBoundingClientRect()
+    wrapperEl.style.height = `${rect.height}px`
+  })
 }
 
+// Re-calculate scale on mount, resize, and data changes
 onMounted(() => {
-  computePreviewScale()
+  setTimeout(computePreviewScale, 100) // Small delay for layout
   window.addEventListener('resize', computePreviewScale)
 })
 onUnmounted(() => window.removeEventListener('resize', computePreviewScale))
+
+watch(() => store.formData, () => {
+  computePreviewScale()
+}, { deep: true })
 
 // Print / PDF
 function printResume() {
@@ -255,20 +275,23 @@ async function handleSubmit() {
   background: var(--clr-surface);
   border: 1px solid var(--clr-border);
   border-radius: var(--radius-lg);
-  overflow: hidden;
-  flex-wrap: wrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;   /* Firefox */
 }
+.rg-stepper::-webkit-scrollbar { display: none; } /* Chrome/Safari */
 
 .rg-step {
   display: flex;
   align-items: center;
-  gap: var(--sp-2);
-  padding: 0.7rem 1rem;
+  gap: 6px;
+  padding: 0.65rem 1rem;
   cursor: pointer;
   flex: 1;
-  min-width: 80px;
+  min-width: 110px;   /* enough to show the longest label without truncating */
   transition: background var(--transition-fast);
   position: relative;
+  flex-shrink: 0;
 }
 
 .rg-step::after {
@@ -320,7 +343,7 @@ async function handleSubmit() {
 }
 
 .rg-step__label {
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--clr-text-muted);
   white-space: nowrap;
@@ -453,10 +476,47 @@ async function handleSubmit() {
   }
 }
 
-@media (max-width: 600px) {
-  .rg-step__label {
-    display: none;
+/* On small screens, keep stepper scrollable — labels stay visible */
+@media (max-width: 900px) {
+  .rg-step {
+    padding: 0.65rem 0.75rem;
   }
+}
+
+@media (max-width: 500px) {
+  .rg-step__bullet {
+    width: 18px;
+    height: 18px;
+    font-size: 9px;
+  }
+}
+
+/* AI generating indicator */
+.rg-ai-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--clr-primary);
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+.rg-ai-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--clr-primary);
+  animation: rg-pulse 1s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes rg-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.7); }
 }
 </style>
 

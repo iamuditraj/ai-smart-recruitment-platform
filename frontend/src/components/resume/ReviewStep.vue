@@ -92,22 +92,26 @@
 
     <!-- ── Module Readiness ────────────────────────────────────────── -->
     <div class="rs-modules" id="rs-module-readiness">
-      <p class="rs-modules__label">Ready for Platform Modules</p>
+      <div class="rs-modules-header">
+        <p class="rs-modules__label">Platform Readiness</p>
+        <div class="rs-modules-line"></div>
+      </div>
       <div class="rs-modules__badges">
         <span
           v-for="label in validation.readyForLabels"
           :key="label"
           class="rs-module-badge"
         >
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
           {{ label }}
         </span>
-        <span
+        <div
           v-if="!validation.readyForLabels?.length"
-          class="rs-module-badge rs-module-badge--none"
+          class="rs-module-empty"
         >
-          Complete required fields to enable modules
-        </span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span>Complete required fields to enable AI modules</span>
+        </div>
       </div>
     </div>
 
@@ -145,30 +149,29 @@
 
     <!-- ── Export Actions ──────────────────────────────────────────── -->
     <div class="rs-export-panel" id="rs-export-panel">
-      <div class="rs-export-title">Export Structured Data</div>
-      <div class="rs-export-actions">
-        <button class="btn btn-primary rs-export-btn" id="rs-btn-save-platform" @click="onSave" :disabled="isSubmitting">
-          <svg v-if="!isSubmitting" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+      <div class="rs-export-header">
+        <div class="rs-export-title">Export Structured Data</div>
+        <p class="rs-export-subtitle">Download your resume data in various formats or save to platform.</p>
+      </div>
+      <div class="rs-export-grid">
+        <button class="btn btn-primary rs-action-btn" id="rs-btn-save-platform" @click="onSave" :disabled="isSubmitting">
+          <svg v-if="!isSubmitting" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
           <span v-else class="loader-sm"></span>
-          {{ isSubmitting ? 'Saving...' : 'Submit to Platform' }}
+          <span>{{ isSubmitting ? 'Saving...' : 'Submit to Platform' }}</span>
         </button>
-        <button class="btn btn-outline rs-export-btn" id="rs-btn-download-json" @click="onDownloadJSON">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Download JSON
+        <button class="btn btn-outline rs-action-btn" id="rs-btn-download-json" @click="onDownloadJSON">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span>JSON</span>
         </button>
         <button
-          class="btn rs-copy-btn"
+          class="btn rs-action-btn"
           :class="clipboardStatus === 'copied' ? 'btn-success' : 'btn-outline'"
           id="rs-btn-copy-json"
           @click="onCopyJSON"
         >
-          <svg v-if="clipboardStatus !== 'copied'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-          <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-          {{ clipboardStatus === 'copied' ? 'Copied!' : clipboardStatus === 'error' ? 'Error' : 'Copy JSON' }}
-        </button>
-        <button class="btn btn-outline rs-export-btn" id="rs-btn-download-pdf" @click="onPrint">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-          Download PDF
+          <svg v-if="clipboardStatus !== 'copied'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          <span>{{ clipboardStatus === 'copied' ? 'Copied' : 'Copy' }}</span>
         </button>
       </div>
     </div>
@@ -238,7 +241,6 @@ function sectionColor(score, max) {
 
 // ── Export handlers ──────────────────────────────────────────────────────────
 function onSave()         { emit('save') }
-function onPrint()        { emit('print') }
 function onDownloadJSON() { downloadJSON(props.structured) }
 function onCopyJSON()     { copyToClipboard(props.structured) }
 
@@ -403,52 +405,78 @@ const prettyJSON = computed(() =>
 .rs-modules {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
+  gap: var(--sp-4);
+  padding: var(--sp-2) 0;
+}
+
+.rs-modules-header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
 }
 
 .rs-modules__label {
-  font-size: 0.75rem;
-  font-weight: 700;
+  font-size: 0.7rem;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   color: var(--clr-text-muted);
+  white-space: nowrap;
+}
+
+.rs-modules-line {
+  height: 1px;
+  background: var(--clr-border);
+  flex: 1;
+  opacity: 0.5;
 }
 
 .rs-modules__badges {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--sp-2);
+  gap: var(--sp-3);
 }
 
 .rs-module-badge {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  background: rgba(99,102,241,0.1);
-  border: 1px solid rgba(99,102,241,0.25);
-  border-radius: var(--radius-full);
-  padding: 0.25rem 0.7rem;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: #a5b4fc;
+  gap: 8px;
+  background: rgba(99,102,241,0.08);
+  border: 1px solid rgba(99,102,241,0.2);
+  border-radius: 10px;
+  padding: 0.5rem 0.8rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--clr-primary-light);
+  box-shadow: var(--shadow-sm);
 }
 
-.rs-module-badge--none {
-  background: rgba(255,255,255,0.04);
-  border-color: var(--clr-border);
+.rs-module-empty {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255,255,255,0.03);
+  border: 1px dashed var(--clr-border);
+  border-radius: 12px;
+  padding: 0.75rem 1.25rem;
   color: var(--clr-text-muted);
+  font-size: 0.85rem;
+  font-weight: 500;
 }
 
 /* ── Computed Highlights ── */
 .rs-computed-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: var(--sp-3);
+  gap: var(--sp-4);
 }
 
-@media (max-width: 700px) {
+@media (max-width: 1200px) {
   .rs-computed-grid { grid-template-columns: repeat(2, 1fr); }
-  .rs-breakdown-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 500px) {
+  .rs-computed-grid { grid-template-columns: 1fr; }
 }
 
 .rs-computed-card {
@@ -457,17 +485,27 @@ const prettyJSON = computed(() =>
   gap: var(--sp-3);
   background: var(--clr-surface);
   border: 1px solid var(--clr-border);
-  border-radius: var(--radius-md);
-  padding: var(--sp-3) var(--sp-4);
+  border-radius: 14px;
+  padding: 1rem;
+  transition: all 0.2s;
+  min-width: 0;
 }
 
-.rs-computed-icon { font-size: 1.4rem; flex-shrink: 0; }
+.rs-computed-card:hover {
+  border-color: var(--clr-border-hover);
+  background: var(--clr-surface-2);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
 
 .rs-computed-card > div {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  flex: 1;
 }
+
+.rs-computed-icon { font-size: 1.5rem; flex-shrink: 0; }
 
 .rs-computed-value {
   font-size: 1rem;
@@ -486,6 +524,11 @@ const prettyJSON = computed(() =>
   font-size: 0.65rem;
   color: #a5b4fc;
   letter-spacing: 0.02em;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .rs-computed-meta {
@@ -498,32 +541,66 @@ const prettyJSON = computed(() =>
 .rs-export-panel {
   background: var(--clr-surface);
   border: 1px solid var(--clr-border);
-  border-radius: var(--radius-md);
-  padding: var(--sp-4) var(--sp-5);
+  border-radius: 16px;
+  padding: var(--sp-6);
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-4);
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: var(--sp-5);
+}
+
+.rs-export-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .rs-export-title {
-  font-size: 0.875rem;
-  font-weight: 700;
-  color: var(--clr-text-light);
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--clr-text);
+  letter-spacing: -0.01em;
 }
 
-.rs-export-actions {
+.rs-export-subtitle {
+  font-size: 0.85rem;
+  color: var(--clr-text-muted);
+}
+
+.rs-export-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: var(--sp-3);
+}
+
+@media (max-width: 600px) {
+  .rs-export-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.rs-action-btn {
   display: flex;
-  gap: var(--sp-2);
-  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  padding: 0.7rem 1rem;
+  font-weight: 700;
+  font-size: 0.85rem;
+  border-radius: 12px;
+  gap: 8px;
+  transition: all 0.2s;
 }
 
-.rs-export-btn, .rs-copy-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.82rem;
+.rs-action-btn.btn-primary {
+  background: linear-gradient(135deg, var(--clr-primary), #4f46e5);
+  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.25);
+  border: none;
+  color: white;
+}
+
+.rs-action-btn.btn-primary:hover:not(:disabled) {
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+  transform: translateY(-2px);
 }
 
 .btn-success {

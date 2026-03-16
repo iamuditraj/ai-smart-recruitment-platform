@@ -66,28 +66,30 @@
 
             <div class="divider my-8"></div>
 
-            <h3 class="subsection-title">Resume</h3>
+            <h3 class="subsection-title">Current Default Resume</h3>
             <div class="resume-section">
-              <div v-if="authStore.user?.resumeUrl" class="current-resume-card">
+              <div v-if="defaultResume" class="current-resume-card">
                 <div class="resume-info">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="resume-icon"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
                   <div class="resume-details">
-                    <span class="resume-name">{{ authStore.user?.resumeName || 'Your Resume.pdf' }}</span>
-                    <a href="javascript:void(0)" @click="viewResume" class="view-link">View File</a>
+                    <span class="resume-name">{{ defaultResume.resumeName || 'Your Resume' }}</span>
+                    <a v-if="defaultResume.type === 'uploaded'" href="javascript:void(0)" @click="viewResume(defaultResume.resumeUrl)" class="view-link">View PDF File</a>
+                    <span v-else class="view-link text-muted" style="text-decoration:none">AI Generated Template</span>
                   </div>
                 </div>
               </div>
 
+              <div v-else class="text-muted text-sm my-4">
+                You haven't set a default resume yet. Upload or generate a resume in the Resume Hub.
+              </div>
+
               <div class="upload-container mt-4">
-                <input type="file" ref="resumeInput" class="hidden-input" accept="application/pdf" @change="handleResumeUpload">
-                <button type="button" class="btn btn-outline" @click="$refs.resumeInput.click()" :disabled="isUploadingResume">
-                  <span v-if="!isUploadingResume">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                    {{ authStore.user?.resumeUrl ? 'Replace Resume (PDF)' : 'Upload Resume (PDF)' }}
+                <RouterLink to="/resume-hub" class="btn btn-outline" style="text-decoration:none">
+                  <span>
+                    Manage Resumes in Resume Hub →
                   </span>
-                  <span v-else class="loader-sm"></span>
-                </button>
-                <p class="text-xs text-muted mt-2">Free Tier: PDFs up to 900KB are stored directly in your profile.</p>
+                </RouterLink>
+                <p class="text-xs text-muted mt-2">Go to the Resume Hub to add, generate, or change your default resume.</p>
               </div>
             </div>
 
@@ -184,14 +186,18 @@ import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '../../stores/auth'
 
 const authStore = useAuthStore()
-const parsedResume = computed(() => authStore.user?.parsedResume || null)
+
+const defaultResume = computed(() => {
+  if (!authStore.user?.resumes) return null
+  return authStore.user.resumes.find(r => r.isDefault) || null
+})
+
+const parsedResume = computed(() => defaultResume.value?.parsedResume || null)
 const isSaving = ref(false)
-const isUploadingResume = ref(false)
 const message = ref('')
 const messageType = ref('success')
 
 const fileInput = ref(null)
-const resumeInput = ref(null)
 const formData = ref({
   name: authStore.user?.name || '',
   phone: authStore.user?.phone || '',
@@ -218,41 +224,7 @@ function handlePhotoUpload(event) {
   reader.readAsDataURL(file)
 }
 
-async function handleResumeUpload(event) {
-  const file = event.target.files[0]
-  if (!file) return
-
-  if (file.type !== 'application/pdf') {
-    message.value = 'Please upload a PDF file'
-    messageType.value = 'error'
-    return
-  }
-
-  if (file.size > 900 * 1024) {
-    message.value = 'Resume size must be less than 900KB for the free tier'
-    messageType.value = 'error'
-    return
-  }
-
-  isUploadingResume.value = true
-  message.value = ''
-
-  const result = await authStore.uploadResume(file)
-
-  isUploadingResume.value = false
-  if (result.success) {
-    message.value = 'Resume saved successfully!'
-    messageType.value = 'success'
-  } else {
-    message.value = result.message || 'Failed to save resume'
-    messageType.value = 'error'
-  }
-
-  setTimeout(() => message.value = '', 3000)
-}
-
-function viewResume() {
-  const dataUri = authStore.user?.resumeUrl
+function viewResume(dataUri) {
   if (!dataUri) return
 
   try {

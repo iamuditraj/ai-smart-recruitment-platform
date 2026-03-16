@@ -55,6 +55,12 @@ const router = createRouter({
       meta: { title: 'Resume Builder — HireAI', requiresAuth: true, role: 'candidate' },
     },
     {
+      path: '/resume-hub',
+      name: 'resume-hub',
+      component: () => import('../views/candidate/ResumeHubView.vue'),
+      meta: { title: 'Resume Hub — HireAI', requiresAuth: true, role: 'candidate' },
+    },
+    {
       path: '/skill-assessment',
       name: 'skill-assessment',
       component: () => import('../views/candidate/SkillAssessmentView.vue'),

@@ -130,6 +130,30 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function setDefaultResume(resume_id) {
+    if (!user.value?.email) return { success: false, message: 'Not logged in' }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/profile/set-default-resume`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: user.value.email, resume_id })
+      })
+      const data = await response.json()
+
+      if (data.status === 'success') {
+        // Refresh user data to get the new default statuses
+        await refreshUser()
+        return { success: true }
+      } else {
+        return { success: false, message: data.message }
+      }
+    } catch (error) {
+      console.error('Set default resume error:', error)
+      return { success: false, message: 'Server connection failed' }
+    }
+  }
+
   function logout() {
     user.value = null
     localStorage.removeItem('auth_user')
@@ -146,6 +170,7 @@ export const useAuthStore = defineStore('auth', () => {
     signup,
     updateProfile,
     uploadResume,
+    setDefaultResume,
     refreshUser,
     logout
   }

@@ -14,7 +14,7 @@ Education tiers: 1=any, 2=diploma, 3=bachelor, 4=master, 5=phd
 
 import re
 from typing import List, Dict, Set, Any
-from .skill_extractor import extract_skills
+from .skill_extractor import extract_skills  # pyre-ignore[21]
 
 # ── Signal phrases that indicate a skill is REQUIRED ──────────────────────
 REQUIRED_SIGNALS = [
@@ -80,7 +80,7 @@ def _extract_title(text: str) -> str:
     Falls back to empty string.
     """
     lines = [l.strip() for l in text.strip().splitlines() if l.strip()]
-    for line in lines[:3]:
+    for line in lines[:3]:  # pyre-ignore[16]
         if len(line.split()) <= 8 and not line.endswith(":"):
             return line
     return ""
@@ -120,11 +120,11 @@ def parse_jd(jd_text: str) -> Dict[str, Any]:
             preferred_skills |= sentence_skills
         else:
             # Default: treat as required if no signal found
-            required_skills |= sentence_skills
+            required_skills |= sentence_skills  # pyre-ignore[58]
 
     # Skills found globally but not sentence-classified → required by default
-    unclassified = all_skills - required_skills - preferred_skills
-    required_skills |= unclassified
+    unclassified = all_skills - required_skills - preferred_skills  # pyre-ignore[58]
+    required_skills |= unclassified  # pyre-ignore[58]
 
     return {
         "required_skills":  sorted(required_skills),
