@@ -50,16 +50,20 @@ def signup():
         if not db:
             return jsonify({"status": "error", "message": "Database not initialized"}), 500
 
-        # Check if user exists in the single users collection
-        user_doc = db.collection('users').document(email).get()
+        # Check if user exists in the user_index collection
+        index_doc = db.collection('user_index').document(email).get()
 
-        if user_doc.exists:
+        if index_doc.exists:
             return jsonify({"status": "error", "message": "User already exists"}), 400
 
-        # Create user in the single users collection
+        # Write the role-lookup doc
+        db.collection('user_index').document(email).set({'role': role})
+
+        # Create user in the appropriate collection
         hashed_password = generate_password_hash(password)
+        collection_name = 'recruiters' if role == 'recruiter' else 'candidates'
         
-        db.collection('users').document(email).set({
+        db.collection(collection_name).document(email).set({
             'email': email,
             'password': hashed_password,
             'role': role,
@@ -94,8 +98,17 @@ def login():
         if not db:
             return jsonify({"status": "error", "message": "Database not initialized"}), 500
 
-        # Get user
-        user_doc = db.collection('users').document(email).get()
+        # Check user_index to get role
+        index_doc = db.collection('user_index').document(email).get()
+
+        if not index_doc.exists:
+            return jsonify({"status": "error", "message": "Invalid email or password"}), 401
+
+        user_role = index_doc.to_dict().get('role')
+        collection_name = 'recruiters' if user_role == 'recruiter' else 'candidates'
+        
+        # Get user from correct collection
+        user_doc = db.collection(collection_name).document(email).get()
 
         if not user_doc.exists:
             return jsonify({"status": "error", "message": "Invalid email or password"}), 401
@@ -155,19 +168,12 @@ def save_resume():
         if not resume_id:
             return jsonify({"status": "error", "message": "No resume_id provided"}), 400
             
-        # Save to 'resumes' collection
-        db.collection('resumes').document(resume_id).set(data)
-        
-        # Also link it to the candidate's multiple resumes array if email exists
         email = data.get('profile', {}).get('contact', {}).get('email')
         if email:
-            candidate_ref = db.collection('users').document(email)
+            candidate_ref = db.collection('candidates').document(email)
             doc_snap = candidate_ref.get()
             if doc_snap.exists:
-                user_data = doc_snap.to_dict()
-                resumes = user_data.get('resumes', [])
-                
-                is_default = len(resumes) == 0
+                is_default = len(list(candidate_ref.collection('resumes').stream())) == 0
                 
                 new_resume = {
                     'id': resume_id,
@@ -179,14 +185,14 @@ def save_resume():
                     'uploadedAt': datetime.datetime.utcnow().isoformat()
                 }
                 
-                update_data = {
-                    'resumes': firestore.ArrayUnion([new_resume]),
-                    'updatedAt': firestore.SERVER_TIMESTAMP
-                }
+                candidate_ref.collection('resumes').document(resume_id).set(new_resume)
+                
                 if is_default:
-                    update_data['defaultResumeId'] = resume_id
-                    
-                candidate_ref.update(update_data)
+                    update_data = {
+                        'defaultResumeId': resume_id,
+                        'updatedAt': firestore.SERVER_TIMESTAMP
+                    }
+                    candidate_ref.update(update_data)
         
         return jsonify({
             "status": "success",
@@ -237,18 +243,7 @@ def analyze_resumes():
             parsed_results.append(result)
 
             # Auto-save to Firestore
-            if db:
-                try:
-                    doc_id = re.sub(r'[^\w]', '_', file.filename)
-                    db.collection('candidate_profiles').document(doc_id).set({
-                        **result,
-                        "source_file":     file.filename,
-                        "job_description": job_description[:300],
-                        "analyzed_at":     firestore.SERVER_TIMESTAMP,
-                        "scoring_engine":  "local_ats_v1",
-                    })
-                except Exception as save_err:
-                    print(f"Warning: Could not save to Firestore: {save_err}")
+            # ATS results returned in API response; saved to jobs/{job_id}/applications on candidate apply
 
         parsed_results.sort(key=lambda x: x.get('score', 0), reverse=True)
 
@@ -319,7 +314,14 @@ def handle_profile():
                 return jsonify({"status": "error", "message": "Email is required"}), 400
             
             # Determine which collection to update
-            user_ref = db.collection('users').document(email)
+            index_doc = db.collection('user_index').document(email).get()
+            if not index_doc.exists:
+                return jsonify({"status": "error", "message": "User not found"}), 404
+                
+            user_role = index_doc.to_dict().get('role')
+            collection_name = 'recruiters' if user_role == 'recruiter' else 'candidates'
+            
+            user_ref = db.collection(collection_name).document(email)
             user_ref.update(data)
             
             # Get updated data
@@ -339,8 +341,14 @@ def handle_profile():
             if not email:
                 return jsonify({"status": "error", "message": "Email is required"}), 400
                 
-            # Check users collection
-            user_doc = db.collection('users').document(email).get()
+            # Check user_index to get role
+            index_doc = db.collection('user_index').document(email).get()
+            if not index_doc.exists:
+                return jsonify({"status": "error", "message": "User not found"}), 404
+                
+            user_role = index_doc.to_dict().get('role')
+            collection_name = 'recruiters' if user_role == 'recruiter' else 'candidates'
+            user_doc = db.collection(collection_name).document(email).get()
                 
             if not user_doc.exists:
                 return jsonify({"status": "error", "message": "User not found"}), 404
@@ -430,12 +438,9 @@ Resume Text:
         # --- End parse ---
 
         # Update candidate profile in Firestore (only candidates upload resumes here)
-        user_ref = db.collection('users').document(email)
-        user_snap = user_ref.get()
-        user_data = user_snap.to_dict() if user_snap.exists else {}
-        resumes = user_data.get('resumes', [])
+        user_ref = db.collection('candidates').document(email)
         
-        is_default = len(resumes) == 0
+        is_default = len(list(user_ref.collection('resumes').stream())) == 0
         resume_id = str(datetime.datetime.utcnow().timestamp()).replace('.', '')
         
         new_resume = {
@@ -448,19 +453,18 @@ Resume Text:
             'uploadedAt': datetime.datetime.utcnow().isoformat()
         }
         
-        update_data = {
-            'resumes': firestore.ArrayUnion([new_resume]),
-            'updatedAt': firestore.SERVER_TIMESTAMP
-        }
+        user_ref.collection('resumes').document(resume_id).set(new_resume)
         
         if is_default:
-            update_data['defaultResumeId'] = resume_id
-            update_data['resumeUrl'] = resume_data_uri
-            update_data['resumeName'] = file.filename
+            update_data = {
+                'defaultResumeId': resume_id,
+                'resumeUrl': resume_data_uri,
+                'resumeName': file.filename,
+                'updatedAt': firestore.SERVER_TIMESTAMP
+            }
             if parsed_resume:
                 update_data['parsedResume'] = parsed_resume
-            
-        user_ref.update(update_data)
+            user_ref.update(update_data)
 
         return jsonify({
             "status": "success",
@@ -487,25 +491,25 @@ def set_default_resume():
         if not email or not resume_id:
             return jsonify({"status": "error", "message": "Email and resume_id are required"}), 400
             
-        user_ref = db.collection('users').document(email)
+        user_ref = db.collection('candidates').document(email)
         doc = user_ref.get()
         
         if not doc.exists:
             return jsonify({"status": "error", "message": "User not found"}), 404
             
-        user_data = doc.to_dict()
-        resumes = user_data.get('resumes', [])
-        
+        all_resumes = list(user_ref.collection('resumes').stream())
         matched_resume = None
-        for r in resumes:
+        
+        for r_doc in all_resumes:
+            r_data = r_doc.to_dict()
             is_match = (
-                str(r.get('id', '')) == str(resume_id) or
-                str(r.get('resume_id', '')) == str(resume_id) or
-                str(r.get('uploadedAt', '')) == str(resume_id)  # fallback for legacy resumes
+                str(r_doc.id) == str(resume_id) or
+                str(r_data.get('resume_id', '')) == str(resume_id) or
+                str(r_data.get('uploadedAt', '')) == str(resume_id)  # fallback
             )
-            r['isDefault'] = is_match
+            r_doc.reference.update({'isDefault': is_match})
             if is_match:
-                matched_resume = r
+                matched_resume = r_data
 
         if not matched_resume:
             return jsonify({"status": "error", "message": "Resume not found in your profile"}), 404
@@ -513,7 +517,6 @@ def set_default_resume():
         assert matched_resume is not None  # type narrowing: already guarded above
 
         update_data = {
-            'resumes': resumes,
             'defaultResumeId': resume_id,
             'resumeName': matched_resume.get('resumeName', 'Default Resume'),
             'updatedAt': firestore.SERVER_TIMESTAMP
@@ -534,6 +537,25 @@ def set_default_resume():
         import traceback
         traceback.print_exc()
         print(f"Error in set_default_resume: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@api_bp.route('/api/profile/resumes', methods=['GET'])
+def get_resumes():
+    try:
+        db = get_db()
+        email = request.args.get('email')
+        if not email:
+            return jsonify({"status": "error", "message": "Email is required"}), 400
+        resumes_ref = db.collection('candidates').document(email).collection('resumes').stream()
+        resumes = []
+        for doc in resumes_ref:
+            r = doc.to_dict()
+            r['id'] = doc.id
+            resumes.append(r)
+        resumes.sort(key=lambda x: x.get('uploadedAt', ''), reverse=True)
+        return jsonify({"status": "success", "resumes": resumes})
+    except Exception as e:
+        print(f"Error in get_resumes: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @api_bp.route('/api/jobs', methods=['GET', 'POST'])
@@ -713,7 +735,7 @@ def apply_for_job():
             return jsonify({"status": "error", "message": "Missing application fields or resume file"}), 400
             
         # Check if already applied
-        existing = db.collection('job_applications').where('job_id', '==', job_id).where('candidate_email', '==', candidate_email).get()
+        existing = db.collection('jobs').document(job_id).collection('applications').where('candidate_email', '==', candidate_email).get()
         if len(existing) > 0:
             return jsonify({"status": "error", "message": "You have already applied for this job"}), 400
             
@@ -743,7 +765,7 @@ def apply_for_job():
             ats_result = score_resume(extracted_resume_text, jd_text, filename=resume_file.filename)
             
         # ── 3. Save Application with ATS Data ────────────────────────────
-        app_ref = db.collection('job_applications').document()
+        app_ref = db.collection('jobs').document(job_id).collection('applications').document()
         app_data = {
             "id": app_ref.id,
             "job_id": job_id,
@@ -790,13 +812,13 @@ def get_recruiter_applications():
         # Here we loop through job_ids since it's likely small for a MVP
         all_apps = []
         for j_id in job_ids:
-            apps = db.collection('job_applications').where('job_id', '==', j_id).get()
+            apps = db.collection('jobs').document(j_id).collection('applications').stream()
             for app_doc in apps:
                 app_data = app_doc.to_dict()
                 
                 # Fetch candidate profile to get name and resume
                 c_email = app_data.get('candidate_email')
-                user_doc = db.collection('users').document(c_email).get()
+                user_doc = db.collection('candidates').document(c_email).get()
                 if user_doc.exists:
                     user_data = user_doc.to_dict()
                     app_data['candidate_name'] = user_data.get('name', 'Unknown')

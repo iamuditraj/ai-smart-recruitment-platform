@@ -5,6 +5,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(JSON.parse(localStorage.getItem('auth_user') || 'null'))
+  const resumes = ref([])
 
   // Derive role directly from user object so it is always in sync.
   // Falls back to localStorage so the sidebar renders correctly on first load.
@@ -85,6 +86,19 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function fetchResumes() {
+    if (!user.value?.email) return
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/profile/resumes?email=${user.value.email}`)
+      const data = await response.json()
+      if (data.status === 'success') {
+        resumes.value = data.resumes
+      }
+    } catch (error) {
+      console.error('fetchResumes error:', error)
+    }
+  }
+
   async function refreshUser() {
     if (!user.value?.email) return
     try {
@@ -101,6 +115,7 @@ export const useAuthStore = defineStore('auth', () => {
     } catch (error) {
       console.error('Refresh user error:', error)
     }
+    await fetchResumes()
   }
 
   async function uploadResume(file) {
@@ -120,6 +135,7 @@ export const useAuthStore = defineStore('auth', () => {
       if (data.status === 'success') {
         // Refresh user data to get the new resume URL
         await refreshUser()
+        await fetchResumes()
         return { success: true, url: data.resumeUrl, name: data.resumeName }
       } else {
         return { success: false, message: data.message }
@@ -144,6 +160,7 @@ export const useAuthStore = defineStore('auth', () => {
       if (data.status === 'success') {
         // Refresh user data to get the new default statuses
         await refreshUser()
+        await fetchResumes()
         return { success: true }
       } else {
         return { success: false, message: data.message }
@@ -163,6 +180,7 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     user,
     role,
+    resumes,
     isAuthenticated,
     isRecruiter,
     isCandidate,
@@ -172,6 +190,7 @@ export const useAuthStore = defineStore('auth', () => {
     uploadResume,
     setDefaultResume,
     refreshUser,
+    fetchResumes,
     logout
   }
 })
