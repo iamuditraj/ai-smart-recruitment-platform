@@ -118,37 +118,58 @@
               </div>
               
               <div v-else-if="previewResult" class="preview-results">
-                 <!-- ATS Summary Card -->
-                 <div class="ats-card card mb-4">
-                   <div class="flex justify-between items-center mb-2">
-                     <h4 class="font-bold">ATS Match Score</h4>
-                     <span :class="['badge', previewResult.badgeClass]">{{ previewResult.score }} / 100</span>
-                   </div>
-                   
-                   <div class="mb-4">
-                     <p class="text-sm font-semibold mb-2">Matched Skills</p>
-                     <div class="flex flex-wrap gap-1">
-                       <span v-for="skill in (previewResult.matched_skills || []).slice(0, 5)" :key="skill" class="skill-tag match">{{ skill }}</span>
-                       <span v-if="(previewResult.matched_skills?.length || 0) > 5" class="skill-tag text-xs">+{{ previewResult.matched_skills.length - 5 }} more</span>
-                     </div>
-                   </div>
-                   
-                   <div v-if="previewResult.key_gaps?.length" class="mb-2">
-                     <p class="text-sm font-semibold mb-2 mt-3">Missing Keywords</p>
-                     <div class="flex flex-wrap gap-1">
-                       <span v-for="gap in previewResult.key_gaps.slice(0, 5)" :key="gap" class="skill-tag gap">{{ gap }}</span>
-                     </div>
-                   </div>
-                 </div>
-                 
-                 <div class="submission-confirmation bg-surface card p-4">
-                   <p class="mb-4 text-sm font-semibold text-center">Do you want to submit this application?</p>
-                   <button class="btn btn-primary w-full" @click="submitFinalApplication" :disabled="isSubmitting">
-                     <span v-if="!isSubmitting">Submit Official Application</span>
-                     <span v-else class="loader-sm"></span>
-                   </button>
-                   <button class="btn btn-text w-full mt-2" @click="resetPreview" :disabled="isSubmitting">Upload Different Resume</button>
-                 </div>
+                  <div class="ats-overall">
+                    <div class="ats-score-header">
+                      <div class="flex items-center">
+                        <span class="ats-score-number" :style="{ color: getScoreColor(previewResult.score) }">{{ previewResult.score }}</span>
+                        <span class="ats-score-denom">/100</span>
+                      </div>
+                      <span :class="['badge', previewResult.badgeClass]">{{ previewResult.status }}</span>
+                    </div>
+                    <div class="ats-main-bar">
+                      <div class="ats-main-bar-fill" :style="{ width: previewResult.score + '%', backgroundColor: getScoreColor(previewResult.score) }"></div>
+                    </div>
+
+                    <div class="breakdown-section">
+                      <h4 class="breakdown-title">Score Breakdown</h4>
+                      <div v-for="dim in scoreDimensions" :key="dim.key" class="breakdown-row">
+                        <span class="breakdown-label">{{ dim.label }}</span>
+                        <div class="breakdown-bar-track">
+                          <div 
+                            class="breakdown-bar-fill" 
+                            :style="{ 
+                              width: ((previewResult.score_breakdown?.[dim.key] || 0) / dim.max * 100) + '%',
+                              backgroundColor: getBreakdownColor(previewResult.score_breakdown?.[dim.key] || 0, dim.max)
+                            }"
+                          ></div>
+                        </div>
+                        <span class="breakdown-score">{{ previewResult.score_breakdown?.[dim.key] || 0 }}/{{ dim.max }}</span>
+                      </div>
+                    </div>
+
+                    <div v-if="previewResult.matched_skills?.length" class="skills-section">
+                      <h4 class="breakdown-title">Matched Skills</h4>
+                      <div class="chips-row">
+                        <span v-for="skill in previewResult.matched_skills.slice(0, 6)" :key="skill" class="chip chip-green">{{ skill }}</span>
+                        <span v-if="previewResult.matched_skills.length > 6" class="chip chip-more">+{{ previewResult.matched_skills.length - 6 }} more</span>
+                      </div>
+                    </div>
+
+                    <div v-if="previewResult.key_gaps?.length" class="skills-section">
+                      <h4 class="breakdown-title">Missing Keywords</h4>
+                      <div class="chips-row">
+                        <span v-for="gap in previewResult.key_gaps.slice(0, 5)" :key="gap" class="chip chip-red">{{ gap }}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="submit-section">
+                    <button class="btn btn-primary w-full" @click="submitFinalApplication" :disabled="isSubmitting">
+                      <span v-if="!isSubmitting">Submit Official Application</span>
+                      <span v-else class="loader-sm"></span>
+                    </button>
+                    <button class="btn-text w-full" @click="resetPreview" :disabled="isSubmitting">Upload Different Resume</button>
+                  </div>
               </div>
             </div>
           </div>
@@ -179,6 +200,30 @@ const selectedResumeFile = ref(null)
 const previewResult = ref(null)
 const isPreviewing = ref(false)
 const isSubmitting = ref(false)
+
+const scoreDimensions = [
+  { key: "required_skills",    label: "Required Skills",    max: 30 },
+  { key: "experience_years",   label: "Experience",         max: 20 },
+  { key: "preferred_skills",   label: "Preferred Skills",   max: 15 },
+  { key: "education",          label: "Education",          max: 10 },
+  { key: "job_title_match",    label: "Job Title Match",    max: 10 },
+  { key: "certifications",     label: "Certifications",     max:  8 },
+  { key: "keyword_density",    label: "Keyword Density",    max:  4 },
+  { key: "resume_completeness",label: "Completeness",       max:  3 },
+]
+
+const getBreakdownColor = (score, max) => {
+  const ratio = max > 0 ? score / max : 0
+  if (ratio >= 0.75) return '#10b981'
+  if (ratio >= 0.4)  return '#f59e0b'
+  return '#ef4444'
+}
+
+const getScoreColor = (score) => {
+  if (score >= 80) return '#10b981'
+  if (score >= 60) return '#f59e0b'
+  return '#ef4444'
+}
 
 const toast = ref({ show: false, message: '', type: 'success' })
 
@@ -540,14 +585,139 @@ onMounted(fetchJobs)
   100% { transform: translateX(-100%); }
 }
 
-.skill-tag {
-  background: var(--clr-surface-2);
-  padding: 0.2rem 0.6rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.75rem;
+.ats-overall {
+  padding: 1rem;
+  border-radius: 10px;
+  border: 1px solid var(--clr-border);
+  margin-bottom: 1rem;
+  background: var(--clr-surface);
 }
-.skill-tag.match { background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid rgba(16, 185, 129, 0.3); }
-.skill-tag.gap { background: rgba(239, 68, 68, 0.15); color: #EF4444; border: 1px solid rgba(239, 68, 68, 0.3); }
+
+.ats-score-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.ats-score-number {
+  font-size: 2.5rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.ats-score-denom {
+  font-size: 1rem;
+  color: var(--clr-text-muted);
+  margin-left: 4px;
+}
+
+.ats-main-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--clr-surface-3);
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+.ats-main-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.6s ease;
+}
+
+.breakdown-section {
+  margin-bottom: 1rem;
+}
+
+.breakdown-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--clr-text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.breakdown-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.breakdown-label {
+  font-size: 0.75rem;
+  color: var(--clr-text-muted);
+  width: 120px;
+  flex-shrink: 0;
+}
+
+.breakdown-bar-track {
+  flex: 1;
+  height: 5px;
+  background: var(--clr-surface-3);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.breakdown-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+.breakdown-score {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--clr-text);
+  width: 36px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.skills-section {
+  margin-bottom: 1rem;
+}
+
+.chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+
+.chip {
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.chip-green {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.chip-red {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.chip-more {
+  background: var(--clr-surface-2);
+  color: var(--clr-text-muted);
+  border: 1px solid var(--clr-border);
+}
+
+.submit-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
 
 .flex { display: flex; }
 .justify-between { justify-content: space-between; }
