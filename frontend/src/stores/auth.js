@@ -26,7 +26,6 @@ export const useAuthStore = defineStore('auth', () => {
 
       if (data.status === 'success') {
         user.value = data.user
-        role.value = data.user.role
         localStorage.setItem('auth_user', JSON.stringify(data.user))
         localStorage.setItem('user_role', data.user.role)
         return { success: true }
@@ -51,7 +50,6 @@ export const useAuthStore = defineStore('auth', () => {
       if (data.status === 'success') {
         // Auto login after signup
         user.value = data.user
-        role.value = data.user.role
         localStorage.setItem('auth_user', JSON.stringify(data.user))
         localStorage.setItem('user_role', data.user.role)
         return { success: true }
