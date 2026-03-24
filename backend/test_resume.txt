@@ -1,5 +1,0 @@
-Jane Doe
-Software Engineer
-5 years of professional experience in software development.
-Proficient in Python, Flask, postgresql, and Docker.
-Has a Bachelor degree in Computer Science.
