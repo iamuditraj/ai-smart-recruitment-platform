@@ -187,10 +187,7 @@ import { useAuthStore } from '../../stores/auth'
 
 const authStore = useAuthStore()
 
-const defaultResume = computed(() => {
-  if (!authStore.user?.resumes) return null
-  return authStore.user.resumes.find(r => r.isDefault) || null
-})
+const defaultResume = computed(() => authStore.resumes?.find(r => r.isDefault) || null)
 
 const parsedResume = computed(() => defaultResume.value?.parsedResume || null)
 const isSaving = ref(false)
@@ -264,7 +261,8 @@ async function saveProfile() {
 }
 
 onMounted(() => {
-  authStore.refreshUser().then(() => {
+  authStore.refreshUser().then(async () => {
+    await authStore.fetchResumes()
     formData.value = {
       name: authStore.user?.name || '',
       phone: authStore.user?.phone || '',

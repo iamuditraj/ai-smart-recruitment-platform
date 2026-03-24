@@ -74,18 +74,22 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '../../stores/auth'
 
 const authStore = useAuthStore()
 const resumes = computed(() => {
-  const list = authStore.user?.resumes || []
+  const list = authStore.resumes || []
   // Sort: default first, then newest first
   return [...list].sort((a, b) => {
     if (a.isDefault) return -1
     if (b.isDefault) return 1
     return new Date(b.uploadedAt) - new Date(a.uploadedAt)
   })
+})
+
+onMounted(() => {
+  authStore.fetchResumes()
 })
 
 const resumeInput = ref(null)
