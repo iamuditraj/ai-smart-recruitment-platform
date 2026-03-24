@@ -7,6 +7,7 @@ Parses a Job Description text into structured requirements:
   - min_exp_years:     minimum years of experience required (int)
   - education_level:   required education tier (int 1-5)
   - job_title:         detected job title (str)
+  - certifications:    list of detected certifications (list)
   - all_skills:        union of required + preferred skills
 
 Education tiers: 1=any, 2=diploma, 3=bachelor, 4=master, 5=phd
@@ -86,6 +87,25 @@ def _extract_title(text: str) -> str:
     return ""
 
 
+def _extract_certifications(text: str) -> List[str]:
+    """
+    Search text (case-insensitive) for any of these certification keywords:
+    Return a sorted list of matched cert strings (lowercase).
+    """
+    cert_keywords = [
+        "aws certified", "azure certified", "gcp certified", "google certified",
+        "pmp", "cissp", "cpa", "cfa", "scrum master", "safe", "itil",
+        "comptia", "cisco", "ccna", "ccnp", "oracle certified",
+        "tensorflow certified", "pytorch certified", "databricks", "snowflake"
+    ]
+    text_lower = text.lower()
+    matched = []
+    for cert in cert_keywords:
+        if re.search(rf"\b{re.escape(cert)}\b", text_lower):
+            matched.append(cert)
+    return sorted(matched)
+
+
 def _split_into_sentences(text: str) -> List[str]:
     """Split text into sentences/bullets for context-aware classification."""
     parts = re.split(r"[.\n•\-\*;]", text)
@@ -98,7 +118,7 @@ def parse_jd(jd_text: str) -> Dict[str, Any]:
 
     Returns a dict with keys:
       required_skills, preferred_skills, all_skills,
-      min_exp_years, education_level, job_title
+      min_exp_years, education_level, job_title, certifications
     """
     all_skills: Set[str] = set(extract_skills(jd_text))
     required_skills: Set[str] = set()
@@ -133,4 +153,5 @@ def parse_jd(jd_text: str) -> Dict[str, Any]:
         "min_exp_years":    _extract_experience_years(jd_text),
         "education_level":  _extract_education_level(jd_text),
         "job_title":        _extract_title(jd_text),
+        "certifications":   _extract_certifications(jd_text),
     }
