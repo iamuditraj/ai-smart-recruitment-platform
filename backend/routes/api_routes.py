@@ -50,18 +50,16 @@ def signup():
         if not db:
             return jsonify({"status": "error", "message": "Database not initialized"}), 500
 
-        # Check if user exists in either collection
-        candidate_doc = db.collection('candidates').document(email).get()
-        recruiter_doc = db.collection('recruiters').document(email).get()
+        # Check if user exists in the single users collection
+        user_doc = db.collection('users').document(email).get()
 
-        if candidate_doc.exists or recruiter_doc.exists:
+        if user_doc.exists:
             return jsonify({"status": "error", "message": "User already exists"}), 400
 
-        # Create user in the appropriate collection based on role
+        # Create user in the single users collection
         hashed_password = generate_password_hash(password)
-        collection_name = 'recruiters' if role == 'recruiter' else 'candidates'
         
-        db.collection(collection_name).document(email).set({
+        db.collection('users').document(email).set({
             'email': email,
             'password': hashed_password,
             'role': role,
@@ -96,10 +94,8 @@ def login():
         if not db:
             return jsonify({"status": "error", "message": "Database not initialized"}), 500
 
-        # Get user (check both collections)
-        user_doc = db.collection('candidates').document(email).get()
-        if not user_doc.exists:
-            user_doc = db.collection('recruiters').document(email).get()
+        # Get user
+        user_doc = db.collection('users').document(email).get()
 
         if not user_doc.exists:
             return jsonify({"status": "error", "message": "Invalid email or password"}), 401
@@ -165,7 +161,7 @@ def save_resume():
         # Also link it to the candidate's multiple resumes array if email exists
         email = data.get('profile', {}).get('contact', {}).get('email')
         if email:
-            candidate_ref = db.collection('candidates').document(email)
+            candidate_ref = db.collection('users').document(email)
             doc_snap = candidate_ref.get()
             if doc_snap.exists:
                 user_data = doc_snap.to_dict()
@@ -323,8 +319,7 @@ def handle_profile():
                 return jsonify({"status": "error", "message": "Email is required"}), 400
             
             # Determine which collection to update
-            collection_name = 'recruiters' if data.get('role') == 'recruiter' else 'candidates'
-            user_ref = db.collection(collection_name).document(email)
+            user_ref = db.collection('users').document(email)
             user_ref.update(data)
             
             # Get updated data
@@ -344,10 +339,8 @@ def handle_profile():
             if not email:
                 return jsonify({"status": "error", "message": "Email is required"}), 400
                 
-            # Check both collections
-            user_doc = db.collection('candidates').document(email).get()
-            if not user_doc.exists:
-                user_doc = db.collection('recruiters').document(email).get()
+            # Check users collection
+            user_doc = db.collection('users').document(email).get()
                 
             if not user_doc.exists:
                 return jsonify({"status": "error", "message": "User not found"}), 404
@@ -437,7 +430,7 @@ Resume Text:
         # --- End parse ---
 
         # Update candidate profile in Firestore (only candidates upload resumes here)
-        user_ref = db.collection('candidates').document(email)
+        user_ref = db.collection('users').document(email)
         user_snap = user_ref.get()
         user_data = user_snap.to_dict() if user_snap.exists else {}
         resumes = user_data.get('resumes', [])
@@ -494,7 +487,7 @@ def set_default_resume():
         if not email or not resume_id:
             return jsonify({"status": "error", "message": "Email and resume_id are required"}), 400
             
-        user_ref = db.collection('candidates').document(email)
+        user_ref = db.collection('users').document(email)
         doc = user_ref.get()
         
         if not doc.exists:
@@ -803,7 +796,7 @@ def get_recruiter_applications():
                 
                 # Fetch candidate profile to get name and resume
                 c_email = app_data.get('candidate_email')
-                user_doc = db.collection('candidates').document(c_email).get()
+                user_doc = db.collection('users').document(c_email).get()
                 if user_doc.exists:
                     user_data = user_doc.to_dict()
                     app_data['candidate_name'] = user_data.get('name', 'Unknown')
