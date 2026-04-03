@@ -16,10 +16,11 @@ Weights (Total: 100):
 """
 
 from typing import List, Dict, Set, Any
-from .skill_extractor import extract_skills
+
 from .jd_parser import parse_jd, EDU_TIERS
 import re
 from rapidfuzz import fuzz
+from services.ai_service import parse_resume_against_jd
 
 WEIGHTS = {
     "required_skills": 30,
@@ -33,32 +34,7 @@ WEIGHTS = {
 }
 
 
-def _extract_years_from_resume(text: str) -> int:
-    """
-    Extract total years of experience claimed in resume text.
-    Looks for patterns like '5 years', '3+ years of experience'.
-    Returns the highest number found (most resumes state total exp once).
-    """
-    patterns = [
-        r"(\d+)\+?\s*years?\s*(?:of\s*)?(?:professional\s*)?experience",
-        r"(\d+)\+?\s*years?\s*(?:in|of|as)",
-        r"experience\s*(?:of\s*)?(\d+)\+?\s*years?",
-    ]
-    found = []
-    for pattern in patterns:
-        matches = re.findall(pattern, text.lower())
-        found.extend(int(m) for m in matches)
-    return max(found) if found else 0
-
-
-def _detect_education_level(text: str) -> int:
-    """Detect highest education level present in resume. Returns tier 1-5."""
-    text_lower = text.lower()
-    for tier, keywords in sorted(EDU_TIERS.items(), reverse=True):
-        for kw in keywords:
-            if kw in text_lower:
-                return tier
-    return 1
+# Heuristic extractors replaced by LLM parsing
 
 
 def _extract_name(text: str) -> str:
@@ -101,35 +77,15 @@ def _detect_category(skills: Set[str]) -> str:
     return "HEALTHCARE"
 
 
-def _score_job_title(resume_text: str, jd_title: str) -> int:
+def _score_job_title(candidate_title: str, jd_title: str) -> int:
     """
-    Extract the candidate's latest job title from the first ~20 lines of resume_text.
-    Use rapidfuzz.fuzz.partial_ratio to compare it against jd_title.
+    Compare the candidate's latest job title against jd_title using rapidfuzz.
     """
     if not jd_title:
         return 10
 
-    lines = [line.strip() for line in resume_text.splitlines() if line.strip()]
-    search_space = lines[:20]
-
-    name_val = _extract_name(resume_text).lower()
-    candidate_title = ""
-
-    for line in search_space:
-        l_lower = line.lower()
-        if l_lower == name_val:
-            continue
-        if "@" in line or "http" in line or "www." in l_lower or re.search(r"\d{3,}", line):
-            continue
-        
-        # Typically job titles are 1-6 words and not excessively long
-        words = line.split()
-        if 1 <= len(words) <= 7:
-            candidate_title = line
-            break
-
-    if not candidate_title and search_space:
-        candidate_title = search_space[0]
+    if not candidate_title:
+        candidate_title = ""
 
     ratio = fuzz.partial_ratio(candidate_title.lower(), jd_title.lower())
     if ratio >= 75:
@@ -139,36 +95,7 @@ def _score_job_title(resume_text: str, jd_title: str) -> int:
     return 0
 
 
-def _score_certifications(resume_text: str, jd_text: str) -> int:
-    """
-    Scan jd_text for certification keywords using a regex pattern list.
-    Score = (matched_certs / total_jd_certs) * 8, capped at 8.
-    """
-    cert_keywords = [
-        "aws certified", "azure certified", "gcp certified", "google certified",
-        "pmp", "cissp", "cpa", "cfa", "scrum master", "safe", "itil",
-        "comptia", "cisco", "ccna", "ccnp", "oracle certified",
-        "tensorflow", "pytorch certified", "databricks", "snowflake"
-    ]
-    
-    jd_text_lower = jd_text.lower()
-    resume_text_lower = resume_text.lower()
-    
-    found_in_jd = []
-    for cert in cert_keywords:
-        if re.search(rf"\b{re.escape(cert)}\b", jd_text_lower):
-            found_in_jd.append(cert)
-            
-    if not found_in_jd:
-        return 8
-    
-    matched_count = 0
-    for cert in found_in_jd:
-        if re.search(rf"\b{re.escape(cert)}\b", resume_text_lower):
-            matched_count += 1
-            
-    score = (matched_count / len(found_in_jd)) * 8
-    return round(min(score, 8))
+# _score_certifications replaced by LLM parsing
 
 
 def _score_keyword_density(resume_text: str, jd_text: str) -> int:
@@ -241,7 +168,18 @@ def score_resume(
             jd_text = "\n".join(sections) + "\n\n" + jd_text
 
     jd = parse_jd(jd_text)
-    resume_skills: Set[str] = set(extract_skills(resume_text))
+    
+    llm_parsed_data = parse_resume_against_jd(resume_text, jd_text)
+    if not llm_parsed_data:
+        llm_parsed_data = {
+            "total_years_experience": 0,
+            "education_tier": 1,
+            "latest_job_title": "",
+            "skills_found": [],
+            "certifications_found": []
+        }
+
+    resume_skills: Set[str] = set(llm_parsed_data.get("skills_found", []))
 
     required: Set[str] = set(jd["required_skills"])
     preferred: Set[str] = set(jd["preferred_skills"])
@@ -256,7 +194,7 @@ def score_resume(
     req_score = round(req_ratio * WEIGHTS["required_skills"])
 
     # 2. Experience years (20 pts)
-    resume_years = _extract_years_from_resume(resume_text)
+    resume_years = max(0, llm_parsed_data.get("total_years_experience") or 0)
     jd_min_years = jd["min_exp_years"]
     if jd_min_years == 0:
         exp_score = WEIGHTS["experience_years"]
@@ -276,7 +214,7 @@ def score_resume(
     pref_score = round(pref_ratio * WEIGHTS["preferred_skills"])
 
     # 4. Education (10 pts)
-    resume_edu = _detect_education_level(resume_text)
+    resume_edu = llm_parsed_data.get("education_tier") or 1
     jd_edu = jd["education_level"]
     if resume_edu >= jd_edu:
         edu_score = WEIGHTS["education"]
@@ -286,10 +224,17 @@ def score_resume(
         edu_score = 0
 
     # 5. Job Title Match (10 pts)
-    title_score = _score_job_title(resume_text, jd["job_title"])
+    title_score = _score_job_title(llm_parsed_data.get("latest_job_title", ""), jd["job_title"])
 
     # 6. Certifications (8 pts)
-    cert_score = _score_certifications(resume_text, jd_text)
+    jd_certs = set(jd.get("certifications", []))
+    resume_certs = set(c.lower() for c in llm_parsed_data.get("certifications_found", []))
+    
+    if not jd_certs:
+        cert_score = 8
+    else:
+        matched_certs = len(jd_certs & resume_certs)
+        cert_score = min(round((matched_certs / len(jd_certs)) * 8), 8)
 
     # 7. Keyword Density (4 pts)
     density_score = _score_keyword_density(resume_text, jd_text)
