@@ -17,10 +17,8 @@ Weights (Total: 100):
 
 from typing import List, Dict, Set, Any
 
-from .jd_parser import parse_jd, EDU_TIERS
 import re
 from rapidfuzz import fuzz
-from services.ai_service import parse_resume_against_jd
 
 WEIGHTS = {
     "required_skills": 30,
@@ -140,12 +138,7 @@ def _score_resume_completeness(resume_text: str) -> int:
     return 0
 
 
-def score_resume(
-    resume_text: str,
-    jd_text: str,
-    filename: str = "",
-    structured_jd: Dict[str, str] | None = None,
-) -> Dict[str, Any]:
+def score_resume(llm_parsed_resume: dict, llm_parsed_jd: dict, resume_text: str = '') -> dict:
     """
     Score a single resume against a job description.
 
@@ -153,36 +146,15 @@ def score_resume(
       name, score, status, badgeClass, skills, experience,
       category, score_breakdown, matched_skills, key_gaps
     """
-    # ── Build full JD text from all available fields ──────────────────────
-    if structured_jd:
-        sections = []
-        if structured_jd.get("requiredSkills"):
-            sections.append(f"Required Skills: {structured_jd['requiredSkills']}")
-        if structured_jd.get("keyResponsibilities"):
-            sections.append(f"Key Responsibilities: {structured_jd['keyResponsibilities']}")
-        if structured_jd.get("preferredQualifications"):
-            sections.append(f"Preferred Qualifications: {structured_jd['preferredQualifications']}")
-        if structured_jd.get("educationalBackground"):
-            sections.append(f"Educational Background: {structured_jd['educationalBackground']}")
-        if sections:
-            jd_text = "\n".join(sections) + "\n\n" + jd_text
+    if not llm_parsed_resume or not llm_parsed_jd or 'total_years_experience' not in llm_parsed_resume or 'required_skills' not in llm_parsed_jd:
+        return {'score': 0, 'status': 'Error parsing document'}
 
-    jd = parse_jd(jd_text)
-    
-    llm_parsed_data = parse_resume_against_jd(resume_text, jd_text)
-    if not llm_parsed_data:
-        llm_parsed_data = {
-            "total_years_experience": 0,
-            "education_tier": 1,
-            "latest_job_title": "",
-            "skills_found": [],
-            "certifications_found": []
-        }
+    jd = llm_parsed_jd
+    llm_parsed_data = llm_parsed_resume
 
     resume_skills: Set[str] = set(llm_parsed_data.get("skills_found", []))
-
-    required: Set[str] = set(jd["required_skills"])
-    preferred: Set[str] = set(jd["preferred_skills"])
+    required: Set[str] = set(jd.get("required_skills", []))
+    preferred: Set[str] = set(jd.get("preferred_skills", []))
 
     # 1. Required skills (30 pts)
     if required:
@@ -195,7 +167,7 @@ def score_resume(
 
     # 2. Experience years (20 pts)
     resume_years = max(0, llm_parsed_data.get("total_years_experience") or 0)
-    jd_min_years = jd["min_exp_years"]
+    jd_min_years = jd.get("min_exp_years", 0)
     if jd_min_years == 0:
         exp_score = WEIGHTS["experience_years"]
     elif resume_years == 0:
@@ -215,7 +187,7 @@ def score_resume(
 
     # 4. Education (10 pts)
     resume_edu = llm_parsed_data.get("education_tier") or 1
-    jd_edu = jd["education_level"]
+    jd_edu = jd.get("education_level", 1)
     if resume_edu >= jd_edu:
         edu_score = WEIGHTS["education"]
     elif resume_edu == jd_edu - 1:
@@ -224,7 +196,7 @@ def score_resume(
         edu_score = 0
 
     # 5. Job Title Match (10 pts)
-    title_score = _score_job_title(llm_parsed_data.get("latest_job_title", ""), jd["job_title"])
+    title_score = _score_job_title(llm_parsed_data.get("latest_job_title", ""), jd.get("job_title", ""))
 
     # 6. Certifications (8 pts)
     jd_certs = set(jd.get("certifications", []))
@@ -237,7 +209,8 @@ def score_resume(
         cert_score = min(round((matched_certs / len(jd_certs)) * 8), 8)
 
     # 7. Keyword Density (4 pts)
-    density_score = _score_keyword_density(resume_text, jd_text)
+    jd_text_approx = jd.get("job_title", "") + " " + " ".join(jd.get("required_skills", []) + jd.get("preferred_skills", []) + jd.get("certifications", []))
+    density_score = _score_keyword_density(resume_text, jd_text_approx)
 
     # 8. Resume Completeness (3 pts)
     comp_score = _score_resume_completeness(resume_text)
@@ -268,10 +241,11 @@ def score_resume(
     exp_summary = f"{resume_years} years experience" if resume_years > 0 else "Experience not specified"
 
     # ── Category detection ────────────────────────────────────────────────
-    category = _detect_category(resume_skills | set(jd["all_skills"]))
+    jd_all_skills = set(jd.get("required_skills", []) + jd.get("preferred_skills", []))
+    category = _detect_category(resume_skills | jd_all_skills)
 
     # ── Candidate name ────────────────────────────────────────────────────
-    name = _extract_name(resume_text) or filename
+    name = _extract_name(resume_text) or "Unknown"
 
     return {
         "name":       name,

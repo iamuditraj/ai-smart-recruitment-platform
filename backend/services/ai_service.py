@@ -1,6 +1,8 @@
 import os
 import json
+import time
 import google.generativeai as genai
+from google.api_core.exceptions import ResourceExhausted
 
 model = None
 
@@ -38,13 +40,25 @@ Resume:
 {resume_text}
 """
     try:
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.GenerationConfig(
-                response_mime_type="application/json"
-            )
-        )
-        return json.loads(response.text)
+        response_text = None
+        for attempt in range(3):
+            try:
+                response = model.generate_content(
+                    prompt,
+                    generation_config=genai.GenerationConfig(
+                        response_mime_type="application/json"
+                    )
+                )
+                response_text = response.text
+                break
+            except Exception as e:
+                if isinstance(e, ResourceExhausted) or '429' in str(e):
+                    if attempt < 2:
+                        print(f"⚠️ Warning: Rate limit hit. Retrying in 6 seconds... (Attempt {attempt + 1})")
+                        time.sleep(6)
+                        continue
+                raise
+        return json.loads(response_text)
     except json.JSONDecodeError:
         print("⚠️ Error: Failed to parse JSON response from Gemini.")
         return {}
@@ -71,13 +85,25 @@ Job Description:
 {jd_text}
 """
     try:
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.GenerationConfig(
-                response_mime_type="application/json"
-            )
-        )
-        return json.loads(response.text)
+        response_text = None
+        for attempt in range(3):
+            try:
+                response = model.generate_content(
+                    prompt,
+                    generation_config=genai.GenerationConfig(
+                        response_mime_type="application/json"
+                    )
+                )
+                response_text = response.text
+                break
+            except Exception as e:
+                if isinstance(e, ResourceExhausted) or '429' in str(e):
+                    if attempt < 2:
+                        print(f"⚠️ Warning: Rate limit hit. Retrying in 6 seconds... (Attempt {attempt + 1})")
+                        time.sleep(6)
+                        continue
+                raise
+        return json.loads(response_text)
     except json.JSONDecodeError:
         print("⚠️ Error: Failed to parse JSON response from Gemini.")
         return {}
