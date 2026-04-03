@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request  # pyre-ignore[21]
 from services.firebase_service import get_db  # pyre-ignore[21]
-from services.ai_service import get_model  # pyre-ignore[21]
+from services.ai_service import get_model, parse_job_description, parse_resume_against_jd  # pyre-ignore[21]
 from services.parser_service import extract_text  # pyre-ignore[21]
 from firebase_admin import firestore  # pyre-ignore[21]
 from werkzeug.security import generate_password_hash, check_password_hash  # pyre-ignore[21]
@@ -222,9 +222,11 @@ def analyze_resumes():
             file_stream = io.BytesIO(file.read())
             extracted_text = extract_text(file_stream, file.filename)
 
-            # ── Local ATS scoring — no Gemini ─────────────────────────────
+            # ── Auto fallback for analyze ─────────────────────────────
             try:
-                result = score_resume(extracted_text, job_description, filename=file.filename)
+                llm_parsed_resume = parse_resume_against_jd(extracted_text, job_description)
+                fallback_jd = {"required_skills": [job_description], "preferred_skills": [], "min_exp_years": 0, "education_level": 1, "job_title": "", "certifications": []}
+                result = score_resume(llm_parsed_resume, fallback_jd, extracted_text)
             except Exception as score_err:
                 print(f"ATS scoring error for {file.filename}: {score_err}")
                 result = {
@@ -721,7 +723,9 @@ def preview_score():
         file_stream = io.BytesIO(resume_file.read())
         extracted_resume_text = extract_text(file_stream, resume_file.filename)
         
-        ats_result = score_resume(extracted_resume_text, jd_text, filename=resume_file.filename, structured_jd=structured_jd)
+        llm_parsed_resume = parse_resume_against_jd(extracted_resume_text, jd_text)
+        fallback_jd = {"required_skills": [structured_jd.get("requiredSkills", "")], "preferred_skills": [structured_jd.get("preferredQualifications", "")], "min_exp_years": 0, "education_level": 1, "job_title": "", "certifications": []}
+        ats_result = score_resume(llm_parsed_resume, fallback_jd, extracted_resume_text)
         
         return jsonify({
             "status": "success",
@@ -773,7 +777,9 @@ def apply_for_job():
         if not ats_result:
             file_stream = io.BytesIO(resume_file.read())
             extracted_resume_text = extract_text(file_stream, resume_file.filename)
-            ats_result = score_resume(extracted_resume_text, jd_text, filename=resume_file.filename, structured_jd=structured_jd)
+            llm_parsed_resume = parse_resume_against_jd(extracted_resume_text, jd_text)
+            fallback_jd = {"required_skills": [structured_jd.get("requiredSkills", "")], "preferred_skills": [structured_jd.get("preferredQualifications", "")], "min_exp_years": 0, "education_level": 1, "job_title": "", "certifications": []}
+            ats_result = score_resume(llm_parsed_resume, fallback_jd, extracted_resume_text)
             
         # ── 3. Save Application with ATS Data ────────────────────────────
         app_ref = db.collection('jobs').document(job_id).collection('applications').document()
@@ -861,3 +867,44 @@ def check_db():
         return jsonify({"status": "success", "message": "Connected to Firestore!"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
+
+@api_bp.route('/api/parse-jd', methods=['POST'])
+def parse_jd_endpoint():
+    try:
+        data = request.json
+        if not data or 'jd_text' not in data:
+            return jsonify({"status": "error", "message": "Missing jd_text"}), 400
+        
+        parsed_jd = parse_job_description(data['jd_text'])
+        return jsonify({
+            "status": "success",
+            "parsed_jd": parsed_jd
+        })
+    except Exception as e:
+        print(f"Error parsing JD: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@api_bp.route('/api/score-resume', methods=['POST'])
+def score_resume_endpoint():
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"status": "error", "message": "Invalid payload"}), 400
+            
+        resume_text = data.get('resume_text')
+        raw_jd_text = data.get('raw_jd_text', '')
+        parsed_jd = data.get('parsed_jd')
+        
+        if not resume_text or not parsed_jd:
+            return jsonify({"status": "error", "message": "Missing resume_text or parsed_jd"}), 400
+            
+        llm_parsed_resume = parse_resume_against_jd(resume_text, raw_jd_text)
+        ats_result = score_resume(llm_parsed_resume, parsed_jd, resume_text)
+        
+        return jsonify({
+            "status": "success",
+            "score": ats_result
+        })
+    except Exception as e:
+        print(f"Error in score-resume: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
