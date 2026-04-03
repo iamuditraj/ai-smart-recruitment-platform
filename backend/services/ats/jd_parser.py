@@ -48,7 +48,7 @@ EDU_TIERS = {
 
 def parse_jd(jd_text: str) -> Dict[str, Any]:
     """
-    Parse a job description and return structured requirements using Gemini AI.
+    Parse a job description and return structured requirements using Groq AI.
 
     Returns a dict with keys:
       required_skills, preferred_skills, all_skills,

@@ -19,7 +19,7 @@ CORS(app)
 # 1. Initialize Firebase
 init_firebase()
 
-# 2. Initialize Gemini AI
+# 2. Initialize Groq AI
 init_ai()
 
 # Register routes

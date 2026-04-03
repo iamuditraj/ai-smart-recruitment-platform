@@ -6,25 +6,11 @@ from firebase_admin import firestore  # pyre-ignore[21]
 from werkzeug.security import generate_password_hash, check_password_hash  # pyre-ignore[21]
 import io
 import json
-import re
 import datetime
 from services.ats.scorer import score_resume  # pyre-ignore[21]
 
 api_bp = Blueprint('api', __name__)
 
-def _clean_json_response(text):
-    """Helper to extract and parse JSON from Gemini markdown output."""
-    try:
-        # Match anything between triple backticks (```json or ```) or the whole text if no backticks
-        match = re.search(r'```(?:json)?\s*([\s\S]*?)```', text)
-        if match:
-            text = match.group(1)
-        # Remove any leading/trailing whitespace
-        text = text.strip()
-        return json.loads(text)
-    except Exception as e:
-        print(f"Error parsing Gemini JSON: {e}\nRaw text: {text}")
-        return None
 
 @api_bp.route('/')
 def home():
@@ -146,10 +132,14 @@ def generate_content():
         if not model:
             return jsonify({"status": "error", "message": "AI model not initialized"}), 500
 
-        response = model.generate_content(full_prompt)
+        response = model.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[{"role": "user", "content": full_prompt}],
+            temperature=0.7,
+        )
         return jsonify({
             "status": "success",
-            "content": response.text
+            "content": response.choices[0].message.content
         })
     except Exception as e:
         print(f"Error in generate_content: {e}")
@@ -217,6 +207,8 @@ def analyze_resumes():
             return jsonify({"status": "error", "message": "Job description is required for ATS scoring"}), 400
 
         parsed_results = []
+        # Parse the JD once via LLM so skills are properly split
+        parsed_jd = parse_job_description(job_description)
 
         for file in resumes:
             file_stream = io.BytesIO(file.read())
@@ -225,8 +217,7 @@ def analyze_resumes():
             # ── Auto fallback for analyze ─────────────────────────────
             try:
                 llm_parsed_resume = parse_resume_against_jd(extracted_text, job_description)
-                fallback_jd = {"required_skills": [job_description], "preferred_skills": [], "min_exp_years": 0, "education_level": 1, "job_title": "", "certifications": []}
-                result = score_resume(llm_parsed_resume, fallback_jd, extracted_text)
+                result = score_resume(llm_parsed_resume, parsed_jd, extracted_text)
             except Exception as score_err:
                 print(f"ATS scoring error for {file.filename}: {score_err}")
                 result = {
@@ -288,8 +279,14 @@ def generate_assessment():
         JSON only. No Markdown, no explanations.
         """
         
-        response = model.generate_content(prompt)
-        questions = _clean_json_response(response.text)
+        response = model.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"},
+            temperature=0.7,
+        )
+        raw = json.loads(response.choices[0].message.content)
+        questions = raw if isinstance(raw, list) else raw.get("questions", [])
         
         if not questions:
             return jsonify({"status": "error", "message": "Failed to generate AI questions"}), 500
@@ -403,7 +400,7 @@ def upload_resume():
         encoded_string = base64.b64encode(file_bytes).decode('utf-8')
         resume_data_uri = f"data:application/pdf;base64,{encoded_string}"
 
-        # --- Extract text and parse with Gemini ---
+        # --- Extract text and parse with Groq ---
         parsed_resume = None
         try:
             file_stream = io.BytesIO(file_bytes)
@@ -429,13 +426,18 @@ If a field is not found, use an empty string or empty array as appropriate.
 Resume Text:
 {raw_text}
 """
-                response = model.generate_content(prompt)
-                parsed_resume = _clean_json_response(response.text)
+                response = model.chat.completions.create(
+                    model="llama-3.1-8b-instant",
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.1,
+                    response_format={"type": "json_object"}
+                )
+                parsed_resume = json.loads(response.choices[0].message.content)
                 print(f"✅ Resume parsed successfully for {email}")
             else:
-                print("⚠️  Skipping Gemini parse: model not ready or no text extracted.")
+                print("⚠️  Skipping Groq parse: model not ready or no text extracted.")
         except Exception as parse_err:
-            print(f"⚠️  Could not parse resume with Gemini: {parse_err}")
+            print(f"⚠️  Could not parse resume with Groq: {parse_err}")
             parsed_resume = None
         # --- End parse ---
 
@@ -692,15 +694,25 @@ def handle_specific_job(job_id):
 
 
 def _build_jd_from_job(job_data: dict) -> tuple:
-    """Build full JD text and structured_jd dict from a Firestore job document."""
-    jd_text = job_data.get('jobSummary') or job_data.get('description') or ""
-    structured_jd = {
-        "requiredSkills": job_data.get('requiredSkills', ''),
-        "keyResponsibilities": job_data.get('keyResponsibilities', ''),
-        "preferredQualifications": job_data.get('preferredQualifications', ''),
-        "educationalBackground": job_data.get('educationalBackground', ''),
-    }
-    return jd_text, structured_jd
+    """Build full JD text from a Firestore job document and parse it with Groq.
+    
+    Returns (jd_text, parsed_jd) where parsed_jd is the LLM-structured dict
+    with keys: required_skills, preferred_skills, min_exp_years,
+    education_level, job_title, certifications.
+    """
+    # Concatenate ALL relevant job fields into a single JD text block
+    parts = []
+    for field in ['title', 'jobSummary', 'description', 'keyResponsibilities',
+                  'requiredSkills', 'softSkills', 'preferredQualifications',
+                  'educationalBackground', 'experienceLevel', 'companyOverview']:
+        val = job_data.get(field, '')
+        if val:
+            parts.append(f"{field}: {val}")
+    jd_text = "\n".join(parts)
+
+    # Use the LLM to properly parse into structured skills, experience, etc.
+    parsed_jd = parse_job_description(jd_text)
+    return jd_text, parsed_jd
 
 
 @api_bp.route('/api/jobs/preview_score', methods=['POST'])
@@ -718,14 +730,13 @@ def preview_score():
             return jsonify({"status": "error", "message": "Job not found"}), 404
             
         job_data = job_doc.to_dict()
-        jd_text, structured_jd = _build_jd_from_job(job_data)
+        jd_text, parsed_jd = _build_jd_from_job(job_data)
         
         file_stream = io.BytesIO(resume_file.read())
         extracted_resume_text = extract_text(file_stream, resume_file.filename)
         
         llm_parsed_resume = parse_resume_against_jd(extracted_resume_text, jd_text)
-        fallback_jd = {"required_skills": [structured_jd.get("requiredSkills", "")], "preferred_skills": [structured_jd.get("preferredQualifications", "")], "min_exp_years": 0, "education_level": 1, "job_title": "", "certifications": []}
-        ats_result = score_resume(llm_parsed_resume, fallback_jd, extracted_resume_text)
+        ats_result = score_resume(llm_parsed_resume, parsed_jd, extracted_resume_text)
         
         return jsonify({
             "status": "success",
@@ -761,7 +772,7 @@ def apply_for_job():
             return jsonify({"status": "error", "message": "Job not found"}), 404
             
         job_data = job_doc.to_dict()
-        jd_text, structured_jd = _build_jd_from_job(job_data)
+        jd_text, parsed_jd = _build_jd_from_job(job_data)
         
         # ── 2. Parse Resume and Score ────────────────────────────────────
         pre_ats_result_raw = request.form.get('ats_result')
@@ -778,8 +789,7 @@ def apply_for_job():
             file_stream = io.BytesIO(resume_file.read())
             extracted_resume_text = extract_text(file_stream, resume_file.filename)
             llm_parsed_resume = parse_resume_against_jd(extracted_resume_text, jd_text)
-            fallback_jd = {"required_skills": [structured_jd.get("requiredSkills", "")], "preferred_skills": [structured_jd.get("preferredQualifications", "")], "min_exp_years": 0, "education_level": 1, "job_title": "", "certifications": []}
-            ats_result = score_resume(llm_parsed_resume, fallback_jd, extracted_resume_text)
+            ats_result = score_resume(llm_parsed_resume, parsed_jd, extracted_resume_text)
             
         # ── 3. Save Application with ATS Data ────────────────────────────
         app_ref = db.collection('jobs').document(job_id).collection('applications').document()
