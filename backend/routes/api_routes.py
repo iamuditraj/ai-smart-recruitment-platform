@@ -689,6 +689,18 @@ def handle_specific_job(job_id):
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+def _build_jd_from_job(job_data: dict) -> tuple:
+    """Build full JD text and structured_jd dict from a Firestore job document."""
+    jd_text = job_data.get('jobSummary') or job_data.get('description') or ""
+    structured_jd = {
+        "requiredSkills": job_data.get('requiredSkills', ''),
+        "keyResponsibilities": job_data.get('keyResponsibilities', ''),
+        "preferredQualifications": job_data.get('preferredQualifications', ''),
+        "educationalBackground": job_data.get('educationalBackground', ''),
+    }
+    return jd_text, structured_jd
+
+
 @api_bp.route('/api/jobs/preview_score', methods=['POST'])
 def preview_score():
     try:
@@ -704,12 +716,12 @@ def preview_score():
             return jsonify({"status": "error", "message": "Job not found"}), 404
             
         job_data = job_doc.to_dict()
-        jd_text = job_data.get('jobSummary') or job_data.get('description') or ""
+        jd_text, structured_jd = _build_jd_from_job(job_data)
         
         file_stream = io.BytesIO(resume_file.read())
         extracted_resume_text = extract_text(file_stream, resume_file.filename)
         
-        ats_result = score_resume(extracted_resume_text, jd_text, filename=resume_file.filename)
+        ats_result = score_resume(extracted_resume_text, jd_text, filename=resume_file.filename, structured_jd=structured_jd)
         
         return jsonify({
             "status": "success",
@@ -745,8 +757,7 @@ def apply_for_job():
             return jsonify({"status": "error", "message": "Job not found"}), 404
             
         job_data = job_doc.to_dict()
-        # Fallback to jobSummary or description fields as the JD text
-        jd_text = job_data.get('jobSummary') or job_data.get('description') or ""
+        jd_text, structured_jd = _build_jd_from_job(job_data)
         
         # ── 2. Parse Resume and Score ────────────────────────────────────
         pre_ats_result_raw = request.form.get('ats_result')
@@ -762,7 +773,7 @@ def apply_for_job():
         if not ats_result:
             file_stream = io.BytesIO(resume_file.read())
             extracted_resume_text = extract_text(file_stream, resume_file.filename)
-            ats_result = score_resume(extracted_resume_text, jd_text, filename=resume_file.filename)
+            ats_result = score_resume(extracted_resume_text, jd_text, filename=resume_file.filename, structured_jd=structured_jd)
             
         # ── 3. Save Application with ATS Data ────────────────────────────
         app_ref = db.collection('jobs').document(job_id).collection('applications').document()
