@@ -805,9 +805,21 @@ def apply_for_job():
             "score_breakdown": ats_result.get("score_breakdown", {}),
             "matched_skills": ats_result.get("matched_skills", []),
             "missing_skills": ats_result.get("key_gaps", []),
-            "resume_filename": resume_file.filename
+            "resume_filename": resume_file.filename,
+            "parsedResume": llm_parsed_resume # Save a snapshot of the parsed resume!
         }
         app_ref.set(app_data)
+
+        # ── 4. Update Candidate Profile with Parsed Resume ──────────
+        try:
+            db.collection('candidates').document(candidate_email).update({
+                "parsedResume": llm_parsed_resume,
+                "resumeName": resume_file.filename,
+                # Optionally update other fields if they are missing
+                "updatedAt": firestore.SERVER_TIMESTAMP
+            })
+        except Exception as update_e:
+            print(f"Non-critical error updating candidate profile: {update_e}")
         
         return jsonify({
             "status": "success", 
@@ -866,6 +878,148 @@ def get_recruiter_applications():
     except Exception as e:
         print(f"Error in get_recruiter_applications: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@api_bp.route('/api/jobs/<job_id>/applications', methods=['GET'])
+def get_job_applications(job_id):
+    """Fetch all applications for a specific job, enriched with candidate info."""
+    try:
+        db = get_db()
+        if not db:
+            return jsonify({"status": "error", "message": "Database not initialized"}), 500
+
+        # Verify the job exists and fetch its title
+        job_doc = db.collection('jobs').document(job_id).get()
+        if not job_doc.exists:
+            return jsonify({"status": "error", "message": "Job not found"}), 404
+
+        job_data = job_doc.to_dict()
+
+        apps = db.collection('jobs').document(job_id).collection('applications').stream()
+        all_apps = []
+        for app_doc in apps:
+            app_data = app_doc.to_dict()
+
+            # Enrich with candidate profile data
+            c_email = app_data.get('candidate_email')
+            if c_email:
+                user_doc = db.collection('candidates').document(c_email).get()
+                if user_doc.exists:
+                    user_data = user_doc.to_dict()
+                    app_data['candidate_name'] = user_data.get('name', c_email.split('@')[0])
+                    # Attach parsed resume (prefer snapshot in application, fallback to profile)
+                    if not app_data.get('parsedResume'):
+                        app_data['parsedResume'] = user_data.get('parsedResume')
+                else:
+                    if not app_data.get('candidate_name'):
+                        app_data['candidate_name'] = c_email.split('@')[0]
+
+            if 'applied_at' in app_data and app_data['applied_at']:
+                app_data['applied_at'] = app_data['applied_at'].isoformat()
+
+            all_apps.append(app_data)
+
+        # Sort by ATS score descending
+        all_apps.sort(key=lambda x: x.get('ats_score', 0), reverse=True)
+
+        return jsonify({
+            "status": "success",
+            "job_title": job_data.get('title', 'Unknown Job'),
+            "job_id": job_id,
+            "applications": all_apps
+        })
+
+    except Exception as e:
+        print(f"Error in get_job_applications: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@api_bp.route('/api/jobs/<job_id>/applications/<app_id>/status', methods=['PATCH'])
+def update_application_status(job_id, app_id):
+    """Update the status of a single application (Shortlisted / Rejected)."""
+    try:
+        db = get_db()
+        if not db:
+            return jsonify({"status": "error", "message": "Database not initialized"}), 500
+
+        data = request.json
+        new_status = data.get('status')
+        if new_status not in ('Shortlisted', 'Rejected', 'Applied'):
+            return jsonify({"status": "error", "message": "Invalid status. Use Shortlisted, Rejected, or Applied."}), 400
+
+        app_ref = db.collection('jobs').document(job_id).collection('applications').document(app_id)
+        app_doc = app_ref.get()
+        if not app_doc.exists:
+            return jsonify({"status": "error", "message": "Application not found"}), 404
+
+        app_ref.update({"status": new_status})
+
+        return jsonify({
+            "status": "success",
+            "message": f"Application status updated to {new_status}",
+            "new_status": new_status
+        })
+
+    except Exception as e:
+        print(f"Error in update_application_status: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@api_bp.route('/api/jobs/<job_id>/applications/bulk-status', methods=['PATCH'])
+def bulk_update_application_status(job_id):
+    """Bulk update application statuses based on a score threshold.
+
+    Body JSON:
+        {
+            "action": "approve" | "reject",
+            "threshold": 80,
+            "direction": "above" | "below"
+        }
+    Example: reject all whose score < 60  →  action=reject, threshold=60, direction=below
+             approve all whose score > 80  →  action=approve, threshold=80, direction=above
+    """
+    try:
+        db = get_db()
+        if not db:
+            return jsonify({"status": "error", "message": "Database not initialized"}), 500
+
+        data = request.json
+        action = data.get('action')       # "approve" or "reject"
+        threshold = data.get('threshold')  # numeric score
+        direction = data.get('direction')  # "above" or "below"
+
+        if action not in ('approve', 'reject'):
+            return jsonify({"status": "error", "message": "action must be 'approve' or 'reject'"}), 400
+        if direction not in ('above', 'below'):
+            return jsonify({"status": "error", "message": "direction must be 'above' or 'below'"}), 400
+        if threshold is None or not isinstance(threshold, (int, float)):
+            return jsonify({"status": "error", "message": "threshold must be a number"}), 400
+
+        new_status = 'Shortlisted' if action == 'approve' else 'Rejected'
+
+        apps = db.collection('jobs').document(job_id).collection('applications').stream()
+        updated_count = 0
+        for app_doc in apps:
+            app_data = app_doc.to_dict()
+            score = app_data.get('ats_score', 0)
+
+            matches = (direction == 'above' and score >= threshold) or \
+                      (direction == 'below' and score < threshold)
+
+            if matches:
+                app_doc.reference.update({"status": new_status})
+                updated_count += 1
+
+        return jsonify({
+            "status": "success",
+            "message": f"{updated_count} applications updated to {new_status}",
+            "updated_count": updated_count
+        })
+
+    except Exception as e:
+        print(f"Error in bulk_update_application_status: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 
 @api_bp.route('/api/check-db')
 def check_db():
