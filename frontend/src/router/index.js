@@ -49,6 +49,12 @@ const router = createRouter({
       meta: { title: 'Find Jobs — HireAI', requiresAuth: true, role: 'candidate' },
     },
     {
+      path: '/my-applications',
+      name: 'my-applications',
+      component: () => import('../views/candidate/MyApplicationsView.vue'),
+      meta: { title: 'My Applications — HireAI', requiresAuth: true, role: 'candidate' },
+    },
+    {
       path: '/resume-generation',
       name: 'resume-generation',
       component: () => import('../views/candidate/ResumeGenerationView.vue'),
