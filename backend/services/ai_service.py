@@ -18,10 +18,26 @@ def init_ai():
 def get_model():
     return client
 
-def _call_groq_json(prompt: str) -> dict:
+# TODO: replace with open source model
+def _run_inference(prompt: str) -> dict:
+    fallback = {
+        "required_skills": [],
+        "preferred_skills": [],
+        "min_exp_years": 0,
+        "education_level": 1,
+        "job_title": "",
+        "certifications": [],
+        "skills_found": [],
+        "total_years_experience": 0,
+        "education_tier": 1,
+        "latest_job_title": ""
+    }
+
     if client is None:
         print("⚠️ Groq client not initialized.")
-        return {}
+        print("⚠️ Groq unavailable — using fallback defaults")
+        return fallback
+
     for attempt in range(3):
         try:
             response = client.chat.completions.create(
@@ -38,8 +54,10 @@ def _call_groq_json(prompt: str) -> dict:
                     time.sleep(5)
                     continue
             print(f"⚠️ Groq API error: {e}")
-            return {}
-    return {}
+            break
+
+    print("⚠️ Groq unavailable — using fallback defaults")
+    return fallback
 
 def parse_resume_against_jd(resume_text: str, jd_text: str) -> dict:
     prompt = f"""Analyze the following resume against the provided job description.
@@ -57,7 +75,7 @@ Resume:
 {resume_text}
 
 JSON only. No markdown."""
-    return _call_groq_json(prompt)
+    return _run_inference(prompt)
 
 def parse_job_description(jd_text: str) -> dict:
     prompt = f"""Analyze the following job description.
@@ -73,4 +91,4 @@ Job Description:
 {jd_text}
 
 JSON only. No markdown."""
-    return _call_groq_json(prompt)
+    return _run_inference(prompt)
