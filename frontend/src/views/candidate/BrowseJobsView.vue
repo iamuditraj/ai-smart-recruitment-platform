@@ -62,6 +62,14 @@
 
           <div class="job-actions">
             <button
+              v-if="appliedJobIds.has(job.id)"
+              class="btn btn-applied w-full"
+              disabled
+            >
+              ✓ Already Applied
+            </button>
+            <button
+              v-else
               @click="initiateApply(job)"
               class="btn btn-primary w-full"
             >
@@ -199,6 +207,7 @@ const selectedJobForApply = ref(null)
 const selectedResumeFile = ref(null)
 const previewResult = ref(null)
 const isPreviewing = ref(false)
+const appliedJobIds = ref(new Set())
 const isSubmitting = ref(false)
 
 const scoreDimensions = [
@@ -230,6 +239,20 @@ const toast = ref({ show: false, message: '', type: 'success' })
 function showToast(message, type = 'success') {
   toast.value = { show: true, message, type }
   setTimeout(() => toast.value.show = false, 3000)
+}
+
+async function fetchAppliedJobs() {
+  try {
+    const email = authStore.user?.email
+    if (!email) return
+    const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/candidate/applied-jobs?email=${encodeURIComponent(email)}`)
+    const data = await res.json()
+    if (data.status === 'success') {
+      appliedJobIds.value = new Set(data.applied_job_ids)
+    }
+  } catch (err) {
+    console.error('Fetch applied jobs error:', err)
+  }
 }
 
 async function fetchJobs() {
@@ -331,7 +354,10 @@ async function submitFinalApplication() {
     const data = await res.json()
     if (data.status === 'success') {
       showToast('Successfully applied! Your ATS score was saved.')
-      closeApplyModal()
+      // Mark this job as applied immediately so the button updates
+      appliedJobIds.value = new Set([...appliedJobIds.value, selectedJobForApply.value.id])
+      isSubmitting.value = false
+      selectedJobForApply.value = null
     } else {
       showToast(data.message || 'Failed to submit application', 'error')
     }
@@ -343,7 +369,10 @@ async function submitFinalApplication() {
   }
 }
 
-onMounted(fetchJobs)
+onMounted(() => {
+  fetchJobs()
+  fetchAppliedJobs()
+})
 </script>
 
 <style scoped>
@@ -430,6 +459,15 @@ onMounted(fetchJobs)
 }
 
 .w-full { width: 100%; }
+
+.btn-applied {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  font-weight: 700;
+  cursor: default;
+  opacity: 0.9;
+}
 
 .hidden-input {
   display: none;
