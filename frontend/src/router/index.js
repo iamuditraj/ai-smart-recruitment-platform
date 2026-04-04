@@ -93,10 +93,10 @@ const router = createRouter({
       meta: { title: 'Edit Hiring Request — HireAI', requiresAuth: true, role: 'recruiter' },
     },
     {
-      path: '/candidate-ranking',
-      name: 'candidate-ranking',
-      component: () => import('../views/recruiter/CandidatesView.vue'),
-      meta: { title: 'Candidate Ranking — HireAI', requiresAuth: true, role: 'recruiter' },
+      path: '/manage-jobs/:jobId/applications',
+      name: 'job-applications',
+      component: () => import('../views/recruiter/JobApplicationsView.vue'),
+      meta: { title: 'Manage Applications — HireAI', requiresAuth: true, role: 'recruiter' },
     },
     {
       path: '/resume-screening',

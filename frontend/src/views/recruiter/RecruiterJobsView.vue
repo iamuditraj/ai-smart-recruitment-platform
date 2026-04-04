@@ -26,6 +26,7 @@
           </div>
           <p class="job-description">{{ job.description }}</p>
           <div class="job-footer">
+            <router-link :to="`/manage-jobs/${job.id}/applications`" class="btn btn-primary btn-sm">Manage Applications</router-link>
             <router-link :to="`/edit-job/${job.id}`" class="btn btn-ghost btn-sm">Edit</router-link>
             <button @click="deleteJob(job.id)" class="btn btn-ghost btn-sm text-danger">Delete</button>
           </div>

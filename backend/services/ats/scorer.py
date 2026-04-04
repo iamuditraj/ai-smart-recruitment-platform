@@ -35,6 +35,20 @@ WEIGHTS = {
 # Heuristic extractors replaced by LLM parsing
 
 
+def _fuzzy_skill_match(resume_skills: Set[str], jd_skills: Set[str], threshold: int = 80) -> Set[str]:
+    """
+    Fuzzy match resume skills against JD skills using rapidfuzz token_sort_ratio.
+    Returns the set of JD skills that matched.
+    """
+    matched = set()
+    for jd_skill in jd_skills:
+        for res_skill in resume_skills:
+            if fuzz.token_sort_ratio(jd_skill.lower(), res_skill.lower()) >= threshold:
+                matched.add(jd_skill)
+                break
+    return matched
+
+
 def _extract_name(text: str) -> str:
     """
     Best-effort name extraction: use first short non-email line.
@@ -158,7 +172,7 @@ def score_resume(llm_parsed_resume: dict, llm_parsed_jd: dict, resume_text: str 
 
     # 1. Required skills (30 pts)
     if required:
-        req_matched = resume_skills & required
+        req_matched = _fuzzy_skill_match(resume_skills, required)
         req_ratio = len(req_matched) / len(required)
     else:
         req_matched = set()
@@ -178,7 +192,7 @@ def score_resume(llm_parsed_resume: dict, llm_parsed_jd: dict, resume_text: str 
 
     # 3. Preferred skills (15 pts)
     if preferred:
-        pref_matched = resume_skills & preferred
+        pref_matched = _fuzzy_skill_match(resume_skills, preferred)
         pref_ratio = len(pref_matched) / len(preferred)
     else:
         pref_matched = set()
@@ -234,7 +248,7 @@ def score_resume(llm_parsed_resume: dict, llm_parsed_jd: dict, resume_text: str 
         badge_class = "badge-danger"
 
     # ── Gap analysis ──────────────────────────────────────────────────────
-    key_gaps = list(sorted(required - resume_skills))[:5]
+    key_gaps = list(sorted(required - req_matched))[:5]
     all_matched = list(sorted(req_matched | pref_matched))
 
     # ── Experience summary string ─────────────────────────────────────────
@@ -252,7 +266,7 @@ def score_resume(llm_parsed_resume: dict, llm_parsed_jd: dict, resume_text: str 
         "score":      final_score,
         "status":     status,
         "badgeClass": badge_class,
-        "skills":     sorted(resume_skills & (required | preferred))[:4],
+        "skills":     sorted(req_matched | pref_matched)[:4],
         "experience": exp_summary,
         "category":   category,
         "score_breakdown": {

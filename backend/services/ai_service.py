@@ -18,10 +18,26 @@ def init_ai():
 def get_model():
     return client
 
-def _call_groq_json(prompt: str) -> dict:
+# TODO: replace with open source model
+def _run_inference(prompt: str) -> dict:
+    fallback = {
+        "required_skills": [],
+        "preferred_skills": [],
+        "min_exp_years": 0,
+        "education_level": 1,
+        "job_title": "",
+        "certifications": [],
+        "skills_found": [],
+        "total_years_experience": 0,
+        "education_tier": 1,
+        "latest_job_title": ""
+    }
+
     if client is None:
         print("⚠️ Groq client not initialized.")
-        return {}
+        print("⚠️ Groq unavailable — using fallback defaults")
+        return fallback
+
     for attempt in range(3):
         try:
             response = client.chat.completions.create(
@@ -38,26 +54,37 @@ def _call_groq_json(prompt: str) -> dict:
                     time.sleep(5)
                     continue
             print(f"⚠️ Groq API error: {e}")
-            return {}
-    return {}
+            break
+
+    print("⚠️ Groq unavailable — using fallback defaults")
+    return fallback
 
 def parse_resume_against_jd(resume_text: str, jd_text: str) -> dict:
-    prompt = f"""Analyze the following resume against the provided job description.
+    prompt = f"""Analyze the following resume in the context of the provided job description. 
+Extract the candidate's professional profile into a detailed JSON format.
+
 Return strict JSON with exactly these keys:
-- "total_years_experience" (int)
-- "education_tier" (int: 1=any, 2=diploma, 3=bachelor, 4=master, 5=phd)
-- "latest_job_title" (str)
-- "skills_found" (list of strings)
-- "certifications_found" (list of strings)
+- "name": (str) Candidate's full name
+- "email": (str)
+- "phone": (str)
+- "summary": (str) A brief professional summary
+- "total_years_experience": (int) Total years of work history
+- "education_tier": (int: 1=any, 2=diploma, 3=bachelor, 4=master, 5=phd)
+- "latest_job_title": (str)
+- "skills": (list of strings) All skills found in the resume
+- "experience": (list of objects) Each object must have: "title", "company", "duration", "description"
+- "education": (list of objects) Each object must have: "degree", "institution", "year"
+- "certifications": (list of strings)
+- "skills_found": (list of strings) specifically those that match or are relevant to the JD
 
 Job Description:
 {jd_text}
 
-Resume:
+Resume content:
 {resume_text}
 
-JSON only. No markdown."""
-    return _call_groq_json(prompt)
+Return ONLY the JSON object. No other text."""
+    return _run_inference(prompt)
 
 def parse_job_description(jd_text: str) -> dict:
     prompt = f"""Analyze the following job description.
@@ -73,4 +100,4 @@ Job Description:
 {jd_text}
 
 JSON only. No markdown."""
-    return _call_groq_json(prompt)
+    return _run_inference(prompt)
