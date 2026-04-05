@@ -206,6 +206,7 @@ const activeFilter = ref('All')
 const selectedJobForApply = ref(null)
 const selectedResumeFile = ref(null)
 const previewResult = ref(null)
+const parsedResumeResult = ref(null)
 const isPreviewing = ref(false)
 const appliedJobIds = ref(new Set())
 const isSubmitting = ref(false)
@@ -284,6 +285,7 @@ function initiateApply(job) {
   selectedJobForApply.value = job
   selectedResumeFile.value = null
   previewResult.value = null
+  parsedResumeResult.value = null
   isPreviewing.value = false
   isSubmitting.value = false
 }
@@ -295,6 +297,7 @@ function closeApplyModal() {
 
 function resetPreview() {
   previewResult.value = null
+  parsedResumeResult.value = null
   selectedResumeFile.value = null
 }
 
@@ -318,6 +321,7 @@ async function handlePreviewUpload(event) {
     const data = await res.json()
     if (data.status === 'success') {
       previewResult.value = data.ats_result
+      parsedResumeResult.value = data.llm_parsed_resume
     } else {
       showToast(data.message || 'Failed to generate preview', 'error')
       selectedResumeFile.value = null
@@ -344,6 +348,9 @@ async function submitFinalApplication() {
     formData.append('candidate_email', authStore.user?.email || '');
     if (previewResult.value) {
       formData.append('ats_result', JSON.stringify(previewResult.value));
+    }
+    if (parsedResumeResult.value) {
+      formData.append('llm_parsed_resume', JSON.stringify(parsedResumeResult.value));
     }
 
     const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/jobs/apply`, {
@@ -796,7 +803,7 @@ onMounted(() => {
   color: white;
   font-weight: 600;
   box-shadow: var(--shadow-lg);
-  z-index: 1000;
+  z-index: 9999;
 }
 .toast.success { background: var(--clr-success); }
 .toast.error { background: var(--clr-danger); }

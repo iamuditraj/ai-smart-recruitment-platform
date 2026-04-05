@@ -741,7 +741,8 @@ def preview_score():
         return jsonify({
             "status": "success",
             "message": "Preview generated successfully!",
-            "ats_result": ats_result
+            "ats_result": ats_result,
+            "llm_parsed_resume": llm_parsed_resume
         })
     except Exception as e:
         print(f"Error previewing score: {e}")
@@ -776,16 +777,24 @@ def apply_for_job():
         
         # ── 2. Parse Resume and Score ────────────────────────────────────
         pre_ats_result_raw = request.form.get('ats_result')
+        pre_parsed_resume_raw = request.form.get('llm_parsed_resume')
+        
+        ats_result = None
+        llm_parsed_resume = None
+        
         if pre_ats_result_raw:
             try:
                 ats_result = json.loads(pre_ats_result_raw)
             except Exception as parse_e:
                 print(f"Error parsing precomputed ATS data: {parse_e}")
-                ats_result = None
-        else:
-            ats_result = None
+                
+        if pre_parsed_resume_raw:
+            try:
+                llm_parsed_resume = json.loads(pre_parsed_resume_raw)
+            except Exception as parse_e:
+                print(f"Error parsing precomputed resume data: {parse_e}")
 
-        if not ats_result:
+        if not ats_result or not llm_parsed_resume:
             file_stream = io.BytesIO(resume_file.read())
             extracted_resume_text = extract_text(file_stream, resume_file.filename)
             llm_parsed_resume = parse_resume_against_jd(extracted_resume_text, jd_text)
@@ -908,6 +917,9 @@ def get_candidate_applications():
                 app_data['company'] = job_data.get('company', '')
                 app_data['location'] = job_data.get('location', '')
                 app_data['job_type'] = job_data.get('type', '')
+
+                if app_data.get('status') in ['Shortlisted', 'Hired']:
+                    app_data['recruiter_email'] = job_data.get('recruiter_email', '')
 
                 if 'applied_at' in app_data and app_data['applied_at']:
                     app_data['applied_at'] = app_data['applied_at'].isoformat()

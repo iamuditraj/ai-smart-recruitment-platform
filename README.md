@@ -1,6 +1,6 @@
-# 🤖 HireAI — AI-Based Smart Recruitment Platform
+# 🤖 HireAI — AI-Powered Smart Recruitment Platform
 
-> An end-to-end AI-powered recruitment platform that automates resume generation, resume screening, skill assessments, job postings, and camera-based mock interview analysis.
+> An end-to-end AI-driven recruitment platform that automates resume parsing, weighted ATS screening, skill assessments, job management, and interactive mock interviews.
 
 ---
 
@@ -9,12 +9,12 @@
 - [About the Project](#about-the-project)
 - [Features](#features)
 - [Tech Stack](#tech-stack)
+- [System Architecture](#system-architecture)
 - [Project Structure](#project-structure)
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
   - [Backend Setup](#backend-setup)
   - [Frontend Setup](#frontend-setup)
-  - [ML Model Setup](#ml-model-setup)
 - [Environment Variables](#environment-variables)
 - [API Reference](#api-reference)
 - [Development Methodology](#development-methodology)
@@ -24,25 +24,26 @@
 
 ## About the Project
 
-**HireAI** bridges the gap between job seekers and recruiters using the power of AI. Candidates can generate professional resumes using Gemini AI, upload them, apply for jobs, and practice interview skills. Recruiters can post jobs, screen resumes against a job description, and get AI-ranked candidate profiles — all in one platform.
+**HireAI** is a modern recruitment ecosystem designed to streamline the hiring process for both candidates and recruiters. Leveraging **Groq AI (Llama 3.1)** and a custom **Weighted ATS Engine**, the platform provides deep insights into candidate-job fit, automates repetitive tasks, and offers candidates tools to improve their employability.
 
 ---
 
 ## ✨ Features
 
-### For Candidates
-- 📝 **AI Resume Generation** — Generate professional resume content using Google Gemini AI
-- 📤 **Resume Upload & Parsing** — Upload a PDF resume and auto-extract structured data (skills, experience, education)
-- 💼 **Job Board** — Browse and apply to jobs posted by recruiters
-- 🧠 **Skill Assessment** — Take AI-generated technical quizzes tailored to a specific role
-- 🎥 **Mock Interview** — AI-powered camera-based interview practice with feedback
-- 👤 **Profile Management** — Manage personal profile, bio, and resume
+### 👤 For Candidates
+- 📝 **AI Resume Hub** — Create, manage, and store multiple resumes (uploaded or AI-generated).
+- 📤 **Intelligent Parsing** — Upload PDF resumes and auto-extract structured data (skills, experience, education) using Groq AI.
+- 💼 **Job Tracking** — Browse jobs, track application statuses, and see real-time ATS match scores.
+- 🧠 **Smart Assessments** — Take AI-generated technical quizzes (MCQs) tailored to specific roles to validate your skills.
+- 🎥 **Mock Interviews** — Practice with a camera-based AI interviewer and receive simulated performance feedback.
+- 🎯 **ATS Preview** — Preview how your resume matches a job before applying.
 
-### For Recruiters
-- 📋 **Job Posting** — Post jobs with requirements and descriptions
-- 📊 **Resume Screening** — Bulk upload resumes, match them against a JD using Gemini AI, and get shortlist/review/reject recommendations
-- 👥 **Candidate Dashboard** — View and manage all applications with candidate details
-- 🏷️ **AI Scoring** — Candidates scored 0–100% with match badges and skill highlights
+### 💼 For Recruiters
+- 📋 **Job Lifecycle Management** — Post, edit, and manage job listings with detailed requirements.
+- 📊 **Advanced ATS Screening** — Bulk analyze resumes against JDs with a weighted scoring logic (Skills, Experience, Education, etc.).
+- 👥 **Candidate Dashboard** — View and manage all applications with AI-ranked candidate profiles and match badges.
+- 🏷️ **Fuzzy Skill Matching** — Intelligent skill comparison using `rapidfuzz` to account for variations in terminology.
+- 🔍 **Gap Analysis** — Automatically identify missing skills and requirements for each candidate.
 
 ---
 
@@ -50,15 +51,14 @@
 
 | Layer | Technology |
 |---|---|
-| **Frontend** | Vue.js 3 (Composition API), Vue Router, Pinia |
+| **Frontend** | Vue.js 3 (Composition API), Pinia, Vue Router, Vanilla CSS |
 | **Backend** | Python, Flask, Flask-CORS |
-| **AI / LLM** | Google Gemini API (`google-generativeai`) |
+| **AI / LLM** | Groq AI API (`llama-3.1-8b-instant`) |
+| **ATS Engine** | Weighted Analysis + `rapidfuzz` (Fuzzy Matching) |
 | **Database** | Firebase Firestore (NoSQL) |
-| **Auth** | Firebase Auth + Custom JWT (Werkzeug password hashing) |
-| **File Parsing** | PyMuPDF (`fitz`), python-docx |
-| **ML Model** | scikit-learn (TF-IDF + Logistic Regression) |
-| **Storage** | Firestore Base64 encoding (free-tier friendly, max 900KB) |
-| **Dev Tools** | Git, Vite, ESLint |
+| **Auth** | Firebase Auth (Lookup) + Custom JWT Logic (`Werkzeug` hashing) |
+| **File Parsing** | PyMuPDF (`fitz`), `python-docx` |
+| **Dev Tools** | Vite, ESLint, Git |
 
 ---
 
@@ -67,50 +67,36 @@
 ```
 ai-smart-recruitment-platform/
 ├── backend/                    # Flask API server
-│   ├── app.py                  # App entry point
+│   ├── app.py                  # Entry point & Initialisation
 │   ├── routes/
-│   │   └── api_routes.py       # All API endpoints
+│   │   └── api_routes.py       # Core API endpoints & logic
 │   ├── services/
-│   │   ├── firebase_service.py # Firestore connection
-│   │   ├── ai_service.py       # Gemini AI connection
-│   │   └── parser_service.py   # PDF/DOCX text extractor
-│   ├── .env                    # Environment variables (not committed)
-│   ├── .env.example            # Template for env setup
+│   │   ├── ai_service.py       # Groq AI integration
+│   │   ├── firebase_service.py # Firestore database wrapper
+│   │   ├── parser_service.py   # PDF/DOCX text extraction
+│   │   └── ats/                # ATS Logic
+│   │       ├── scorer.py       # Weighted scoring & fuzzy matching
+│   │       └── jd_parser.py    # JD structure extraction
+│   ├── firebase/               # Firebase config & service account
 │   ├── requirements.txt        # Python dependencies
-│   └── serviceAccountKey.json  # Firebase service account (not committed)
+│   └── .env.example            # Environment variables template
 │
 ├── frontend/                   # Vue.js 3 SPA
-│   └── src/
-│       ├── views/              # Page-level components
-│       │   ├── HomeView.vue
-│       │   ├── LoginView.vue
-│       │   ├── SignupView.vue
-│       │   ├── ProfileView.vue
-│       │   ├── DashboardView.vue
-│       │   ├── CandidateDashboardView.vue
-│       │   ├── ResumeGenerationView.vue
-│       │   ├── ResumeScreeningView.vue
-│       │   ├── SkillAssessmentView.vue
-│       │   ├── MockInterviewView.vue
-│       │   ├── BrowseJobsView.vue
-│       │   ├── RecruiterJobsView.vue
-│       │   └── CandidatesView.vue
-│       ├── components/         # Reusable UI components
-│       ├── stores/             # Pinia state management
-│       ├── router/             # Vue Router config
-│       └── utils/              # Helper utilities
+│   ├── src/
+│   │   ├── views/              # Organized by user role
+│   │   │   ├── candidate/      # BrowseJobs, MockInterview, SkillAssessment, etc.
+│   │   │   ├── recruiter/      # Dashboard, PostJob, ResumeScreening, etc.
+│   │   │   └── shared/         # Home, Login, Signup
+│   │   ├── components/         # Reusable UI components
+│   │   ├── stores/             # Pinia state management
+│   │   ├── assets/             # Main CSS & Images
+│   │   └── utils/              # API helpers (Axios)
+│   └── package.json            # Node dependencies
 │
-├── ml_model/                   # ML pipeline (Resume Classifier)
-│   ├── preprocess.py           # Data preprocessing + model training
-│   ├── datasets/               # Training datasets (Kaggle resume data)
-│   ├── models/                 # Saved .pkl model + vectorizer
-│   └── requirements.txt        # ML-specific dependencies
-│
-├── agile/                      # Agile/Scrum documentation
 ├── docs/                       # Project documentation
-├── modules/                    # Feature module specs
-├── future-scope.md
-└── risks-and-limitations.md
+├── modules/                    # Feature specifications
+├── future-scope.md             # Roadmap
+└── risks-and-limitations.md     # Risk analysis
 ```
 
 ---
@@ -120,110 +106,94 @@ ai-smart-recruitment-platform/
 ### Prerequisites
 
 - **Python 3.10+**
-- **Node.js 18+** and **npm**
-- A **Firebase project** with Firestore enabled
-- A **Google Gemini API key**
+- **Node.js 18+** & **npm**
+- **Firebase Project** with Firestore enabled
+- **Groq AI API Key** (Get it from [Groq Console](https://console.groq.com/))
 
 ---
 
 ### Backend Setup
 
-```bash
-# 1. Navigate to backend directory
-cd backend
+1. **Navigate to backend:**
+   ```bash
+   cd backend
+   ```
 
-# 2. Create and activate virtual environment
-python -m venv .venv
-.venv\Scripts\activate        # Windows
-# source .venv/bin/activate   # macOS/Linux
+2. **Setup Virtual Environment:**
+   ```bash
+   python -m venv .venv
+   .venv\Scripts\activate  # Windows
+   # source .venv/bin/activate  # macOS/Linux
+   ```
 
-# 3. Install dependencies
-pip install -r requirements.txt
+3. **Install Dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-# 4. Set up environment variables
-copy .env.example .env
-# Then fill in your API keys in .env
+4. **Environment Variables:**
+   ```bash
+   copy .env.example .env
+   # Fill in your GROQ_API_KEY and Firebase paths
+   ```
 
-# 5. Place your Firebase service account key
-# Download serviceAccountKey.json from Firebase Console
-# and place it in the /backend directory
-
-# 6. Run the Flask server
-python app.py
-```
-
-The backend will start at: `http://localhost:5000`
+5. **Run the Server:**
+   ```bash
+   python app.py
+   ```
+   *The backend starts at `http://localhost:5000`*
 
 ---
 
 ### Frontend Setup
 
-```bash
-# 1. Navigate to frontend directory
-cd frontend
+1. **Navigate to frontend:**
+   ```bash
+   cd frontend
+   ```
 
-# 2. Install dependencies
-npm install
+2. **Install Dependencies:**
+   ```bash
+   npm install
+   ```
 
-# 3. Start development server
-npm run dev
-```
-
-The frontend will start at: `http://localhost:5173`
-
----
-
-### ML Model Setup
-
-```bash
-# 1. Navigate to ML model directory
-cd ml_model
-
-# 2. Create and activate virtual environment
-python -m venv .venv
-.venv\Scripts\activate        # Windows
-
-# 3. Install dependencies
-pip install -r requirements.txt
-
-# 4. Run preprocessing and training
-python preprocess.py
-```
-
-Trained model and vectorizer will be saved in `ml_model/models/`.
+3. **Start Development Server:**
+   ```bash
+   npm run dev
+   ```
+   *The frontend starts at `http://localhost:5173`*
 
 ---
 
 ## 🔐 Environment Variables
 
-Create a `.env` file inside the `backend/` directory based on `.env.example`:
+Create a `.env` file in the `backend/` directory:
 
 ```env
-GEMINI_API_KEY=your_google_gemini_api_key
-FIREBASE_CREDENTIALS_PATH=serviceAccountKey.json
+GROQ_API_KEY=your_groq_api_key_here
+FIREBASE_SERVICE_ACCOUNT_KEY=firebase/serviceAccountKey.json
 FLASK_ENV=development
 ```
 
-> ⚠️ Never commit `.env` or `serviceAccountKey.json` to version control.
+> [!IMPORTANT]
+> Never commit `.env` or any `serviceAccountKey.json` files to the repository.
 
 ---
 
-## 📡 API Reference
+## 📡 API Reference (Core)
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `POST` | `/api/signup` | Register a new user (candidate/recruiter) |
-| `POST` | `/api/login` | Login and receive user session |
-| `GET/POST` | `/api/profile` | Get or update user profile |
-| `POST` | `/api/profile/upload-resume` | Upload PDF resume + auto-parse via Gemini |
-| `POST` | `/api/generate-content` | AI-generate resume section content |
-| `POST` | `/api/save-resume` | Save structured resume to Firestore |
-| `POST` | `/api/analyze` | Bulk resume screening against a JD |
-| `POST` | `/api/generate-assessment` | Generate role-specific MCQ quiz via AI |
-| `GET/POST` | `/api/jobs` | List all jobs or post a new job |
-| `POST` | `/api/jobs/apply` | Apply for a job |
-| `GET` | `/api/recruiter/applications` | Get all applications for recruiter's jobs |
-| `GET` | `/api/check-db` | Health check — Firestore connectivity |
+| `POST` | `/api/signup` | User registration (Candidate/Recruiter) |
+| `POST` | `/api/login` | Session authentication |
+| `GET/POST` | `/api/profile` | Handle user profile data |
+| `POST` | `/api/analyze` | Individual or bulk ATS resume analysis |
+| `POST` | `/api/jobs/apply` | Apply for a job and calculate ATS score |
+| `POST` | `/api/generate-content` | AI-generated resume content via Groq |
+| `POST` | `/api/generate-assessment` | Generate technical MCQs for a specific role |
+| `GET/POST` | `/api/jobs` | Fetch job board or post new job listings |
+| `GET/PUT/DEL` | `/api/jobs/<id>` | Manage specific job details |
+| `GET` | `/api/profile/resumes`| Retrieve all stored resumes for a candidate |
 
 ---
 
