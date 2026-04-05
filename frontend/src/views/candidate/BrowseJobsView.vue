@@ -803,7 +803,7 @@ onMounted(() => {
   color: white;
   font-weight: 600;
   box-shadow: var(--shadow-lg);
-  z-index: 1000;
+  z-index: 9999;
 }
 .toast.success { background: var(--clr-success); }
 .toast.error { background: var(--clr-danger); }

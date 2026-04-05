@@ -64,6 +64,12 @@
           </div>
 
           <div class="app-card__right">
+            <!-- Recruiter Contact (Conditionally Visible) -->
+            <div v-if="app.recruiter_email" class="recruiter-contact gap-row">
+              <span class="contact-label">Recruiter Contact:</span>
+              <a :href="`mailto:${app.recruiter_email}`" class="contact-link" title="Click to email">{{ app.recruiter_email }}</a>
+            </div>
+
             <!-- ATS Score -->
             <div class="score-ring">
               <svg viewBox="0 0 36 36" class="circular-chart">
@@ -268,6 +274,17 @@ onMounted(fetchApplications)
 .meta-date { font-size: 0.78rem; color: var(--clr-text-light); }
 
 .app-card__right { display: flex; align-items: center; gap: 1.5rem; flex-shrink: 0; }
+
+/* Recruiter Contact */
+.recruiter-contact {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  margin-right: 0.5rem;
+}
+.contact-label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; color: var(--clr-text-muted); }
+.contact-link { font-size: 0.85rem; font-weight: 600; color: var(--clr-primary); text-decoration: none; }
+.contact-link:hover { text-decoration: underline; }
 
 /* Score Ring */
 .score-ring { position: relative; width: 52px; height: 52px; }

@@ -918,6 +918,9 @@ def get_candidate_applications():
                 app_data['location'] = job_data.get('location', '')
                 app_data['job_type'] = job_data.get('type', '')
 
+                if app_data.get('status') in ['Shortlisted', 'Hired']:
+                    app_data['recruiter_email'] = job_data.get('recruiter_email', '')
+
                 if 'applied_at' in app_data and app_data['applied_at']:
                     app_data['applied_at'] = app_data['applied_at'].isoformat()
 
