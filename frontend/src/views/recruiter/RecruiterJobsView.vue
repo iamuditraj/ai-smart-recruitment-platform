@@ -10,10 +10,12 @@
       </div>
 
       <div class="jobs-grid grid animate-fade-in-up" style="animation-delay: 0.1s">
-        <div v-if="jobs.length === 0" class="empty-state card full-width">
-          <h3>No jobs posted yet</h3>
-          <p>Click the button above to post your first job opportunity.</p>
-        </div>
+        <AppEmptyState
+          v-if="jobs.length === 0"
+          title="No jobs posted yet"
+          description='Click the button above to post your first job opportunity.'
+          class="full-width"
+        />
 
         <div v-for="job in jobs" :key="job.id" class="job-card card">
           <div class="job-card__header">
@@ -39,6 +41,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '../../stores/auth'
+import AppEmptyState from '@/components/AppEmptyState.vue'
 
 const authStore = useAuthStore()
 const jobs = ref([])
@@ -101,7 +104,7 @@ onMounted(fetchMyJobs)
  overflow: hidden; }
 .job-footer { margin-top: auto; display: flex; gap: 0.5rem; padding-top: 1rem; border-top: 1px solid var(--clr-border); }
 
-.empty-state { grid-column: 1 / -1; text-align: center; padding: 4rem; }
+
 
 .text-danger { color: var(--clr-danger); }
 

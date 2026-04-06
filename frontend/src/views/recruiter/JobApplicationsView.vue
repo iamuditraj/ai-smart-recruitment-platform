@@ -38,7 +38,7 @@
 
       <!-- Loading State -->
       <div v-if="isLoading" class="loading-placeholder card animate-fade-in">
-        <div class="spinner"></div>
+        <AppSpinner size="md" />
         <p>Loading applications...</p>
       </div>
 
@@ -117,11 +117,12 @@
       </div>
 
       <!-- Empty State -->
-      <div v-else class="empty-placeholder card animate-fade-in">
-        <div class="empty-icon">📭</div>
-        <h3>No applications yet</h3>
-        <p>Candidates haven't applied for this job yet. Share the posting to attract talent!</p>
-      </div>
+      <AppEmptyState
+        v-else
+        icon="📭"
+        title="No applications yet"
+        description="Candidates haven't applied for this job yet. Share the posting to attract talent!"
+      />
     </div>
 
     <!-- ───── Candidate Detail Modal ───── -->
@@ -154,41 +155,12 @@
           <!-- ATS Score Section -->
           <div class="v-modal-section">
             <h4 class="section-label">ATS Analysis</h4>
-            <div class="analysis-box">
-              <div class="analysis-score">
-                <span class="score-big">{{ selectedApp.ats_score || 0 }}%</span>
-                <span class="score-small">Match Score</span>
-              </div>
-              <div class="analysis-details">
-                <div v-if="selectedApp.matched_skills && selectedApp.matched_skills.length" class="detail-row">
-                  <strong>Matched Skills:</strong>
-                  <div class="skill-stack modal-skills">
-                    <span v-for="skill in selectedApp.matched_skills" :key="skill" class="v-tag">{{ skill }}</span>
-                  </div>
-                </div>
-                <div v-if="selectedApp.missing_skills && selectedApp.missing_skills.length" class="detail-row gap-row">
-                  <strong>Missing Skills:</strong>
-                  <div class="skill-stack modal-skills">
-                    <span v-for="skill in selectedApp.missing_skills" :key="skill" class="v-tag gap-tag">{{ skill }}</span>
-                  </div>
-                </div>
-                <div v-if="selectedApp.score_breakdown" class="detail-row">
-                  <strong>Score Breakdown:</strong>
-                  <div class="breakdown-grid">
-                    <div v-for="dim in scoreDimensions" :key="dim.key" class="breakdown-item">
-                      <span class="breakdown-label">{{ dim.label }}</span>
-                      <div class="breakdown-bar-wrap">
-                        <div class="breakdown-bar" :style="{
-                          width: `${Math.min((selectedApp.score_breakdown[dim.key] || 0) / dim.max * 100, 100)}%`,
-                          backgroundColor: getBreakdownColor(selectedApp.score_breakdown[dim.key] || 0, dim.max)
-                        }"></div>
-                      </div>
-                      <span class="breakdown-val">{{ selectedApp.score_breakdown[dim.key] || 0 }}/{{ dim.max }}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <AtsScorePanel
+              :score="selectedApp.ats_score || 0"
+              :breakdown="selectedApp.score_breakdown"
+              :matchedSkills="selectedApp.matched_skills"
+              :missingSkills="selectedApp.missing_skills"
+            />
           </div>
 
           <!-- Parsed Resume Section -->
@@ -266,6 +238,12 @@
 import { ref, onMounted } from 'vue'
 import AppModal from '@/components/AppModal.vue'
 import { useRoute } from 'vue-router'
+import { scoreDimensions } from '@/utils/atsConstants'
+import { getBreakdownColor, avatarGrad, initials } from '@/utils/uiHelpers'
+import AppSpinner from '@/components/AppSpinner.vue'
+import AppAlert from '@/components/AppAlert.vue'
+import AppEmptyState from '@/components/AppEmptyState.vue'
+import AtsScorePanel from '@/components/AtsScorePanel.vue'
 
 const route = useRoute()
 const jobId = route.params.jobId
@@ -278,31 +256,7 @@ const selectedApp = ref(null)
 const approveThreshold = ref(80)
 const rejectThreshold = ref(60)
 
-const scoreDimensions = [
-  { key: "required_skills",    label: "Required Skills",    max: 30 },
-  { key: "experience_years",   label: "Experience",         max: 20 },
-  { key: "preferred_skills",   label: "Preferred Skills",   max: 15 },
-  { key: "education",          label: "Education",          max: 10 },
-  { key: "job_title_match",    label: "Job Title Match",    max: 10 },
-  { key: "certifications",     label: "Certifications",     max:  8 },
-  { key: "keyword_density",    label: "Keyword Density",    max:  4 },
-  { key: "resume_completeness",label: "Completeness",       max:  3 },
-]
 
-const getBreakdownColor = (score, max) => {
-  const ratio = max > 0 ? score / max : 0
-  if (ratio >= 0.75) return '#10b981'
-  if (ratio >= 0.4)  return '#f59e0b'
-  return '#ef4444'
-}
-
-function avatarGrad() {
-  return `linear-gradient(135deg, #${Math.floor(Math.random()*16777215).toString(16).padStart(6,'0')}, #${Math.floor(Math.random()*16777215).toString(16).padStart(6,'0')})`
-}
-
-function initials(name) {
-  return (name || '?').split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2)
-}
 
 async function fetchApplications() {
   isLoading.value = true
@@ -609,22 +563,10 @@ onMounted(fetchApplications)
 .action-btn.details:hover { background: var(--clr-primary); color: white; border-color: var(--clr-primary); }
 
 /* ═══ Loading & Empty ════════════════════════════════════════ */
-.loading-placeholder, .empty-placeholder {
-  text-align: center;
-  padding: 4rem 2rem;
-}
-.loading-placeholder:hover, .empty-placeholder:hover { transform: none; }
-.spinner {
-  width: 36px; height: 36px;
-  border: 3px solid var(--clr-surface-3);
-  border-top-color: var(--clr-primary);
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
-  margin: 0 auto 1rem;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
 
-.empty-icon { font-size: 3rem; margin-bottom: 1rem; }
+
+
+
 
 .v-modal-header { display: flex; gap: var(--sp-4); margin-bottom: var(--sp-6); }
 
@@ -647,35 +589,7 @@ onMounted(fetchApplications)
 .v-modal-section { margin-bottom: var(--sp-6); }
 
 /* Analysis Box */
-.analysis-box {
-  background: var(--clr-surface-2);
-  border-radius: var(--radius-lg);
-  padding: 1.25rem;
-  display: flex;
-  gap: 1.25rem;
-  border: 1px solid var(--clr-border);
-}
-.analysis-score {
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  padding-right: 1.25rem;
-  border-right: 1px solid var(--clr-border);
-  min-width: 90px;
-}
-.score-big { font-size: 2rem; font-weight: 800; color: var(--clr-primary); line-height: 1; }
-.score-small { font-size: 0.7rem; color: var(--clr-text-muted); text-transform: uppercase; margin-top: 4px; font-weight: 700; }
 
-.analysis-details { flex: 1; display: flex; flex-direction: column; gap: 0.75rem; }
-.detail-row strong { font-size: 0.82rem; color: var(--clr-text); display: block; margin-bottom: 0.35rem; }
-.modal-skills { margin-top: 0.15rem; }
-
-/* Breakdown Grid */
-.breakdown-grid { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.25rem; }
-.breakdown-item { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.2rem; }
-.breakdown-label { font-size: 0.78rem; color: var(--clr-text-muted); width: 120px; flex-shrink: 0; text-transform: capitalize; }
-.breakdown-bar-wrap { flex: 1; height: 6px; background: var(--clr-surface-3); border-radius: 99px; overflow: hidden; }
-.breakdown-bar { height: 100%; border-radius: 99px; transition: width 0.6s ease; }
-.breakdown-val { font-size: 0.75rem; font-weight: 700; color: var(--clr-text); width: 36px; text-align: right; flex-shrink: 0; }
 
 /* Parsed Resume Card */
 .parsed-resume-card {

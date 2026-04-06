@@ -11,7 +11,7 @@
         @click="generateAISummary(store.formData)"
       >
         <span v-if="!isGenerating">✨ AI Generate</span>
-        <span v-else class="loader-sm"></span>
+        <AppSpinner v-else size="sm" />
       </button>
     </div>
     <div class="form-group">
@@ -37,6 +37,7 @@
 <script setup>
 import { useResumeStore } from '../../../stores/resume.js'
 import { useResumeAI } from '../../../composables/useResumeAI.js'
+import AppSpinner from '@/components/AppSpinner.vue'
 
 const store = useResumeStore()
 const { generateAISummary, isGenerating } = useResumeAI()
@@ -53,17 +54,7 @@ const { generateAISummary, isGenerating } = useResumeAI()
   background: rgba(139,92,246,0.1);
 }
 
-.loader-sm {
-  width: 12px;
-  height: 12px;
-  border: 2px solid rgba(255,255,255,0.2);
-  border-top-color: currentColor;
-  border-radius: 50%;
-  animation: rotate 1s linear infinite;
-  display: inline-block;
-}
 
-@keyframes rotate { to { transform: rotate(360deg); } }
 
 /* Textarea */
 .rg-textarea {

@@ -8,41 +8,43 @@
           <p class="page-subtitle">Track all jobs you've applied to and their current status</p>
         </div>
         <div class="stats-row">
-          <div class="stat-pill">
-            <span class="stat-count">{{ applications.length }}</span>
-            <span class="stat-label">Total</span>
-          </div>
-          <div class="stat-pill stat-approved">
-            <span class="stat-count">{{ statusCounts.Shortlisted }}</span>
-            <span class="stat-label">Shortlisted</span>
-          </div>
-          <div class="stat-pill stat-pending">
-            <span class="stat-count">{{ statusCounts.Applied }}</span>
-            <span class="stat-label">Pending</span>
-          </div>
-          <div class="stat-pill stat-rejected">
-            <span class="stat-count">{{ statusCounts.Rejected }}</span>
-            <span class="stat-label">Rejected</span>
-          </div>
+          <KpiCard
+            label="Total"
+            :value="applications.length"
+            variant="simple"
+            style="flex: 1;"
+          />
+          <KpiCard
+            label="Shortlisted"
+            :value="statusCounts.Shortlisted"
+            variant="simple"
+            style="flex: 1; --clr-text: #10b981;"
+          />
+          <KpiCard
+            label="Pending"
+            :value="statusCounts.Applied"
+            variant="simple"
+            style="flex: 1; --clr-text: #f59e0b;"
+          />
+          <KpiCard
+            label="Rejected"
+            :value="statusCounts.Rejected"
+            variant="simple"
+            style="flex: 1; --clr-text: #ef4444;"
+          />
         </div>
       </div>
 
       <!-- Filter Tabs -->
-      <div class="filter-row animate-fade-in-up" style="animation-delay: 0.05s">
-        <button
-          v-for="f in ['All', 'Applied', 'Shortlisted', 'Rejected']"
-          :key="f"
-          @click="activeFilter = f"
-          :class="['filter-chip', { active: activeFilter === f }]"
-        >
-          {{ f }}
-          <span v-if="f !== 'All'" class="chip-count">{{ statusCounts[f] || 0 }}</span>
-        </button>
-      </div>
+      <AppFilterTabs
+        v-model="activeFilter"
+        :tabs="['All', 'Applied', 'Shortlisted', 'Rejected']"
+        :counts="statusCounts"
+      />
 
       <!-- Loading State -->
       <div v-if="isLoading" class="loading-box card animate-fade-in">
-        <div class="spinner"></div>
+        <AppSpinner size="md" />
         <p>Loading your applications...</p>
       </div>
 
@@ -89,12 +91,14 @@
       </div>
 
       <!-- Empty State -->
-      <div v-else class="empty-box card animate-fade-in">
-        <div class="empty-icon">📋</div>
-        <h3>No applications{{ activeFilter !== 'All' ? ` with status "${activeFilter}"` : '' }}</h3>
+      <AppEmptyState
+        v-else
+        icon="📋"
+        :title="activeFilter === 'All' ? 'No applications' : 'No applications with status \'' + activeFilter + '\''"
+      >
         <p v-if="activeFilter === 'All'">You haven't applied to any jobs yet. <router-link to="/jobs" class="link-primary">Browse opportunities →</router-link></p>
         <p v-else>No applications match this filter.</p>
-      </div>
+      </AppEmptyState>
     </div>
   </div>
 </template>
@@ -102,6 +106,12 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '../../stores/auth'
+import { formatDate } from '@/utils/dateUtils'
+import AppSpinner from '@/components/AppSpinner.vue'
+import AppAlert from '@/components/AppAlert.vue'
+import AppEmptyState from '@/components/AppEmptyState.vue'
+import AppFilterTabs from '@/components/AppFilterTabs.vue'
+import KpiCard from '@/components/KpiCard.vue'
 
 const authStore = useAuthStore()
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5001'
@@ -149,17 +159,7 @@ function avatarGrad(name) {
   return `linear-gradient(135deg, hsl(${h1}, 70%, 55%), hsl(${h2}, 80%, 45%))`
 }
 
-function formatDate(isoStr) {
-  if (!isoStr) return 'recently'
-  const d = new Date(isoStr)
-  const now = new Date()
-  const diffMs = now - d
-  const diffDays = Math.floor(diffMs / 86400000)
-  if (diffDays === 0) return 'today'
-  if (diffDays === 1) return 'yesterday'
-  if (diffDays < 7) return `${diffDays} days ago`
-  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-}
+
 
 function scoreClass(score) {
   if (score >= 80) return 'circle-high'
@@ -191,50 +191,10 @@ onMounted(fetchApplications)
 
 /* Stats Row */
 .stats-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
-.stat-pill {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 0.75rem 1.25rem;
-  background: var(--clr-surface);
-  border: 1px solid var(--clr-border);
-  border-radius: var(--radius-lg);
-  min-width: 80px;
-  transition: all 0.2s;
-}
-.stat-pill:hover { border-color: var(--clr-border-hover); box-shadow: var(--shadow-sm); }
-.stat-count { font-size: 1.5rem; font-weight: 800; font-family: var(--font-heading); color: var(--clr-text); line-height: 1; }
-.stat-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--clr-text-muted); margin-top: 2px; }
-.stat-approved .stat-count { color: #10b981; }
-.stat-pending .stat-count  { color: #f59e0b; }
-.stat-rejected .stat-count { color: #ef4444; }
 
-/* ═══ Filter Row ═════════════════════════════════════════════ */
-.filter-row { display: flex; gap: 0.75rem; margin-bottom: var(--sp-6); flex-wrap: wrap; }
-.filter-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.5rem 1.25rem;
-  border-radius: var(--radius-full);
-  background: var(--clr-surface);
-  border: 1px solid var(--clr-border);
-  color: var(--clr-text-muted);
-  font-weight: 600;
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.filter-chip:hover { border-color: var(--clr-primary); color: var(--clr-primary); }
-.filter-chip.active { background: var(--clr-primary); color: white; border-color: var(--clr-primary); }
-.chip-count {
-  background: rgba(255,255,255,0.2);
-  padding: 0.1rem 0.4rem;
-  border-radius: 99px;
-  font-size: 0.72rem;
-  font-weight: 700;
-}
-.filter-chip:not(.active) .chip-count { background: var(--clr-surface-2); }
+
+
+
 
 /* ═══ Application Cards ══════════════════════════════════════ */
 .apps-list { display: flex; flex-direction: column; gap: var(--sp-3); }
@@ -322,16 +282,8 @@ onMounted(fetchApplications)
 /* ═══ Loading & Empty ════════════════════════════════════════ */
 .loading-box, .empty-box { text-align: center; padding: 4rem 2rem; }
 .loading-box:hover, .empty-box:hover { transform: none; }
-.spinner {
-  width: 36px; height: 36px;
-  border: 3px solid var(--clr-surface-3);
-  border-top-color: var(--clr-primary);
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
-  margin: 0 auto 1rem;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-.empty-icon { font-size: 3rem; margin-bottom: 1rem; }
+
+
 .link-primary { color: var(--clr-primary); font-weight: 600; }
 
 /* ═══ Responsive ═════════════════════════════════════════════ */

@@ -22,9 +22,7 @@
         </div>
 
         <form @submit.prevent="handleSignup" class="login-form">
-          <div v-if="errorMessage" class="error-banner animate-fade-in">
-            {{ errorMessage }}
-          </div>
+          <AppAlert :message="errorMessage" type="error" />
 
           <div class="form-group">
             <label class="form-label">I am a...</label>
@@ -88,7 +86,7 @@
           <div class="login-footer">
             <button type="submit" class="btn btn-primary w-full" :disabled="isLoading">
               <span v-if="!isLoading">Create Free Account</span>
-              <span v-else class="loader-sm"></span>
+              <AppSpinner v-else size="sm" />
             </button>
           </div>
         </form>
@@ -105,6 +103,8 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
+import AppSpinner from '@/components/AppSpinner.vue'
+import AppAlert from '@/components/AppAlert.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -137,16 +137,7 @@ async function handleSignup() {
 </script>
 
 <style scoped>
-.error-banner {
-  background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
-  padding: 0.75rem;
-  border-radius: var(--radius-md);
-  font-size: 0.85rem;
-  font-weight: 600;
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  text-align: center;
-}
+
 
 .login-view {
   min-height: 90vh;
@@ -223,19 +214,7 @@ async function handleSignup() {
   margin-top: var(--sp-2);
 }
 
-.loader-sm {
-  width: 18px;
-  height: 18px;
-  border: 2px solid rgba(255,255,255,0.2);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  display: inline-block;
-}
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
 
 .text-muted {
   color: var(--clr-text-muted);

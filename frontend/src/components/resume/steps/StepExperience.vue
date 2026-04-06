@@ -12,11 +12,13 @@
       Click <strong>"+ Add Role"</strong> to start adding work experience.
     </div>
 
-    <div v-for="(exp, i) in store.formData.experience" :key="exp.id" class="rg-entry-block">
-      <div class="rg-entry-block__header">
-        <span class="rg-entry-index">Role {{ i + 1 }}</span>
-        <button class="btn btn-ghost rg-remove-btn" :id="`rg-remove-exp-${i}`" @click="store.removeExperience(exp.id)">Remove</button>
-      </div>
+    <ResumeEntryBlock
+      v-for="(exp, i) in store.formData.experience"
+      :key="exp.id"
+      :index="i"
+      label="Role"
+      @remove="store.removeExperience(exp.id)"
+    >
       <div class="form-grid">
         <div class="form-group">
           <label class="form-label">Job Title</label>
@@ -54,7 +56,7 @@
             @click="generateAIExperience(store.formData, i)"
           >
             <span v-if="!isGenerating">✨ Improve with AI</span>
-            <span v-else class="loader-sm"></span>
+            <AppSpinner v-else size="sm" />
           </button>
         </div>
         <textarea class="form-input" v-model="exp.description" rows="4"
@@ -62,13 +64,15 @@
           placeholder="• Led a team of 4 engineers to build an NLP-based resume parser reducing screening time by 60%&#10;• Deployed models serving 10K+ requests/day on AWS SageMaker...">
         </textarea>
       </div>
-    </div>
+    </ResumeEntryBlock>
   </div>
 </template>
 
 <script setup>
 import { useResumeStore } from '../../../stores/resume.js'
 import { useResumeAI } from '../../../composables/useResumeAI.js'
+import AppSpinner from '@/components/AppSpinner.vue'
+import ResumeEntryBlock from '@/components/ResumeEntryBlock.vue'
 
 const store = useResumeStore()
 const { generateAIExperience, isGenerating } = useResumeAI()
@@ -76,36 +80,7 @@ const { generateAIExperience, isGenerating } = useResumeAI()
 
 <style scoped>
 /* Entry Block */
-.rg-entry-block {
-  background: var(--clr-surface);
-  border: 1px solid var(--clr-border);
-  border-radius: var(--radius-md);
-  padding: var(--sp-4) var(--sp-5);
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
-  margin-top: var(--sp-4);
-}
 
-.rg-entry-block__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.rg-entry-index {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: var(--clr-primary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.rg-remove-btn {
-  font-size: 0.8rem;
-  color: var(--clr-danger);
-  padding: 0.3rem 0.6rem;
-}
 
 /* Empty Hint */
 .rg-empty-hint {
@@ -130,17 +105,7 @@ const { generateAIExperience, isGenerating } = useResumeAI()
 }
 .rg-ai-btn-inline:hover { text-decoration: underline; }
 
-.loader-sm {
-  width: 12px;
-  height: 12px;
-  border: 2px solid rgba(255,255,255,0.2);
-  border-top-color: currentColor;
-  border-radius: 50%;
-  animation: rotate 1s linear infinite;
-  display: inline-block;
-}
 
-@keyframes rotate { to { transform: rotate(360deg); } }
 
 /* Form grid */
 .form-grid {

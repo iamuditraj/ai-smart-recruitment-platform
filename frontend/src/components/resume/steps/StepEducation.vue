@@ -12,11 +12,13 @@
       Click <strong>"+ Add Education"</strong> to add your academic background.
     </div>
 
-    <div v-for="(edu, i) in store.formData.education" :key="edu.id" class="rg-entry-block">
-      <div class="rg-entry-block__header">
-        <span class="rg-entry-index">Education {{ i + 1 }}</span>
-        <button class="btn btn-ghost rg-remove-btn" :id="`rg-remove-edu-${i}`" @click="store.removeEducation(edu.id)">Remove</button>
-      </div>
+    <ResumeEntryBlock
+      v-for="(edu, i) in store.formData.education"
+      :key="edu.id"
+      :index="i"
+      label="Education"
+      @remove="store.removeEducation(edu.id)"
+    >
       <div class="form-grid">
         <div class="form-group form-group--full">
           <label class="form-label">Degree / Qualification</label>
@@ -43,48 +45,20 @@
           <input type="text" class="form-input" v-model="edu.gpa" placeholder="e.g. 8.7 / 10" :id="`rg-edu-gpa-${i}`"/>
         </div>
       </div>
-    </div>
+    </ResumeEntryBlock>
   </div>
 </template>
 
 <script setup>
 import { useResumeStore } from '../../../stores/resume.js'
+import ResumeEntryBlock from '../../ResumeEntryBlock.vue'
 
 const store = useResumeStore()
 </script>
 
 <style scoped>
 /* Entry Block */
-.rg-entry-block {
-  background: var(--clr-surface);
-  border: 1px solid var(--clr-border);
-  border-radius: var(--radius-md);
-  padding: var(--sp-4) var(--sp-5);
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
-  margin-top: var(--sp-4);
-}
 
-.rg-entry-block__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.rg-entry-index {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: var(--clr-primary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.rg-remove-btn {
-  font-size: 0.8rem;
-  color: var(--clr-danger);
-  padding: 0.3rem 0.6rem;
-}
 
 /* Empty Hint */
 .rg-empty-hint {
