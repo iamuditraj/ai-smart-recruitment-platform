@@ -1,6 +1,6 @@
 <template>
-  <div class="mock-interview section">
-    <div class="container--fluid">
+  <div class="mock-interview">
+    <div class="content-area">
       <!-- ====== Header ====== -->
       <div class="page-header animate-fade-in-up">
         <div>

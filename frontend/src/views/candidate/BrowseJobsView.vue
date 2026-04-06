@@ -81,11 +81,7 @@
     </div>
 
     <!-- Pre-Application Modal Overlay -->
-    <Transition name="fade">
-      <div v-if="selectedJobForApply" class="modal-overlay" @click.self="closeApplyModal">
-        <div class="modal-content apply-modal">
-          <button class="modal-close" @click="closeApplyModal">&times;</button>
-          
+    <AppModal :show="!!selectedJobForApply" customClass="apply-modal" @close="closeApplyModal">
           <div class="modal-split">
             <!-- Left Pane: Job Info -->
             <div class="modal-pane job-info-pane">
@@ -181,9 +177,7 @@
               </div>
             </div>
           </div>
-        </div>
-      </div>
-    </Transition>
+    </AppModal>
 
     <!-- Notification -->
     <Transition name="fade">
@@ -197,6 +191,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '../../stores/auth'
+import AppModal from '@/components/AppModal.vue'
 
 const authStore = useAuthStore()
 const jobs = ref([])
@@ -503,66 +498,39 @@ onMounted(() => {
 .mt-2 { margin-top: 0.5rem; }
 .text-sm { font-size: 0.85rem; }
 
-/* Modal Styles */
-.modal-overlay {
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2000;
-}
-
-.modal-content.apply-modal {
-  background: var(--clr-bg);
-  width: 90%;
+/* Modal Integration Styles */
+:deep(.apply-modal) {
   max-width: 900px;
-  height: 80vh;
-  border-radius: var(--radius-lg);
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  box-shadow: var(--shadow-xl);
-  overflow: hidden;
 }
-
-.modal-close {
-  position: absolute;
-  top: 1rem; right: 1.5rem;
-  background: transparent;
-  border: none;
-  font-size: 2rem;
-  color: var(--clr-text-muted);
-  cursor: pointer;
-  z-index: 10;
-}
-.modal-close:hover { color: var(--clr-text); }
 
 .modal-split {
   display: flex;
   flex-direction: row;
-  height: 100%;
-  overflow: hidden;
+  gap: 2rem;
 }
 
 @media (max-width: 768px) {
   .modal-split {
     flex-direction: column;
-    overflow-y: auto;
   }
 }
 
 .modal-pane {
   flex: 1;
-  padding: 2.5rem;
-  overflow-y: auto;
 }
 
 .job-info-pane {
+  padding-right: 1.5rem;
   border-right: 1px solid var(--clr-border);
-  background: var(--clr-surface);
+}
+
+@media (max-width: 768px) {
+  .job-info-pane {
+    padding-right: 0;
+    padding-bottom: 1.5rem;
+    border-right: none;
+    border-bottom: 1px solid var(--clr-border);
+  }
 }
 
 .job-title-modal { font-size: 1.5rem; font-weight: 800; color: var(--clr-text); margin-bottom: 0.25rem; }

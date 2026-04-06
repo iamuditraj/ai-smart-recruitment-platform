@@ -173,7 +173,7 @@ const currentPageTitle = computed(() => {
 
 .main-content {
   flex: 1;
-  padding: 2rem;
+  padding: 0;
   overflow-y: auto;
 }
 
