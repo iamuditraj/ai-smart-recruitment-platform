@@ -126,25 +126,26 @@
 
     <!-- ───── Candidate Detail Modal ───── -->
     <Transition name="v-modal">
-      <div v-if="selectedApp" class="v-modal-overlay" @click.self="selectedApp = null">
+      <div v-if="selectedApp" class="v-modal-overlay" @click.self="selectedApp = null" @wheel.self="handleOverlayScroll">
         <div class="v-modal-card card">
           <button class="v-modal-close" @click="selectedApp = null">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
           </button>
 
-          <div class="v-modal-header">
-            <div class="v-modal-avatar" :style="`background: ${selectedApp._avatarGrad}`">
-              {{ selectedApp._initials }}
-            </div>
-            <div class="v-modal-title-area">
-              <h2 class="v-modal-name">{{ selectedApp.candidate_name || selectedApp.candidate_email }}</h2>
-              <div class="v-modal-meta">
-                <span>{{ selectedApp.candidate_email }}</span>
-                <span class="dot-sep"></span>
-                <span class="status-badge" :class="statusClass(selectedApp.status)">{{ selectedApp.status }}</span>
+          <div class="v-modal-content-scroll" ref="scrollContentRef">
+            <div class="v-modal-header">
+              <div class="v-modal-avatar" :style="`background: ${selectedApp._avatarGrad}`">
+                {{ selectedApp._initials }}
+              </div>
+              <div class="v-modal-title-area">
+                <h2 class="v-modal-name">{{ selectedApp.candidate_name || selectedApp.candidate_email }}</h2>
+                <div class="v-modal-meta">
+                  <span>{{ selectedApp.candidate_email }}</span>
+                  <span class="dot-sep"></span>
+                  <span class="status-badge" :class="statusClass(selectedApp.status)">{{ selectedApp.status }}</span>
+                </div>
               </div>
             </div>
-          </div>
 
           <div class="v-modal-contact-actions">
             <a target="_blank" rel="noopener noreferrer" :href="generateGmailLink(selectedApp)" class="btn btn-outline btn-sm">
@@ -181,12 +182,15 @@
                 <div v-if="selectedApp.score_breakdown" class="detail-row">
                   <strong>Score Breakdown:</strong>
                   <div class="breakdown-grid">
-                    <div v-for="(val, key) in selectedApp.score_breakdown" :key="key" class="breakdown-item">
-                      <span class="breakdown-label">{{ formatBreakdownKey(key) }}</span>
+                    <div v-for="dim in scoreDimensions" :key="dim.key" class="breakdown-item">
+                      <span class="breakdown-label">{{ dim.label }}</span>
                       <div class="breakdown-bar-wrap">
-                        <div class="breakdown-bar" :style="`width: ${Math.min(val, 100)}%`"></div>
+                        <div class="breakdown-bar" :style="{
+                          width: `${Math.min((selectedApp.score_breakdown[dim.key] || 0) / dim.max * 100, 100)}%`,
+                          backgroundColor: getBreakdownColor(selectedApp.score_breakdown[dim.key] || 0, dim.max)
+                        }"></div>
                       </div>
-                      <span class="breakdown-val">{{ val }}</span>
+                      <span class="breakdown-val">{{ selectedApp.score_breakdown[dim.key] || 0 }}/{{ dim.max }}</span>
                     </div>
                   </div>
                 </div>
@@ -261,6 +265,7 @@
             <button v-if="selectedApp.status !== 'Shortlisted'" class="btn btn-approve" @click="updateStatus(selectedApp, 'Shortlisted'); selectedApp = null">Approve</button>
             <button v-if="selectedApp.status !== 'Rejected'" class="btn btn-reject" @click="updateStatus(selectedApp, 'Rejected'); selectedApp = null">Reject</button>
           </div>
+          </div>
         </div>
       </div>
     </Transition>
@@ -268,7 +273,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 
 const route = useRoute()
@@ -281,6 +286,33 @@ const isLoading = ref(true)
 const selectedApp = ref(null)
 const approveThreshold = ref(80)
 const rejectThreshold = ref(60)
+
+const scrollContentRef = ref(null)
+
+function handleOverlayScroll(e) {
+  e.preventDefault();
+  if (scrollContentRef.value) {
+    scrollContentRef.value.scrollTop += e.deltaY;
+  }
+}
+
+const scoreDimensions = [
+  { key: "required_skills",    label: "Required Skills",    max: 30 },
+  { key: "experience_years",   label: "Experience",         max: 20 },
+  { key: "preferred_skills",   label: "Preferred Skills",   max: 15 },
+  { key: "education",          label: "Education",          max: 10 },
+  { key: "job_title_match",    label: "Job Title Match",    max: 10 },
+  { key: "certifications",     label: "Certifications",     max:  8 },
+  { key: "keyword_density",    label: "Keyword Density",    max:  4 },
+  { key: "resume_completeness",label: "Completeness",       max:  3 },
+]
+
+const getBreakdownColor = (score, max) => {
+  const ratio = max > 0 ? score / max : 0
+  if (ratio >= 0.75) return '#10b981'
+  if (ratio >= 0.4)  return '#f59e0b'
+  return '#ef4444'
+}
 
 function avatarGrad() {
   return `linear-gradient(135deg, #${Math.floor(Math.random()*16777215).toString(16).padStart(6,'0')}, #${Math.floor(Math.random()*16777215).toString(16).padStart(6,'0')})`
@@ -357,10 +389,6 @@ function scoreColorClass(score) {
   return 'circle-low'
 }
 
-function formatBreakdownKey(key) {
-  return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
-}
-
 function generateGmailLink(app) {
   if (!app) return '#'
   const candidateName = app.candidate_name || 'Candidate'
@@ -369,6 +397,18 @@ function generateGmailLink(app) {
   
   return `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(app.candidate_email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
 }
+
+watch(selectedApp, (newVal) => {
+  if (newVal) {
+    document.body.style.overflow = 'hidden'
+  } else {
+    document.body.style.overflow = ''
+  }
+})
+
+onUnmounted(() => {
+  document.body.style.overflow = ''
+})
 
 onMounted(fetchApplications)
 </script>
@@ -627,21 +667,43 @@ onMounted(fetchApplications)
 }
 
 .v-modal-card {
-  width: 100%; max-width: 720px; max-height: 90vh; overflow-y: auto;
+  width: 100%; max-width: 720px;
   background: var(--clr-surface);
   border-radius: var(--radius-xl);
   padding: var(--sp-8);
   position: relative;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
 }
 .v-modal-card:hover { transform: none; }
 
+.v-modal-content-scroll {
+  overflow-y: auto;
+  max-height: calc(90vh - 4rem);
+  padding-right: 0.5rem;
+}
+.v-modal-content-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.v-modal-content-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.v-modal-content-scroll::-webkit-scrollbar-thumb {
+  background: var(--clr-surface-3);
+  border-radius: var(--radius-full);
+}
+.v-modal-content-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--clr-primary);
+}
+
 .v-modal-close {
-  position: absolute; top: 1.5rem; right: 1.5rem;
+  position: absolute; top: 1.5rem; right: 2.5rem;
   background: var(--clr-surface-2); border: none;
   width: 36px; height: 36px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; color: var(--clr-text-muted);
+  z-index: 10;
 }
 
 .v-modal-header { display: flex; gap: var(--sp-4); margin-bottom: var(--sp-6); }
@@ -689,11 +751,11 @@ onMounted(fetchApplications)
 
 /* Breakdown Grid */
 .breakdown-grid { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.25rem; }
-.breakdown-item { display: flex; align-items: center; gap: 0.75rem; }
+.breakdown-item { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.2rem; }
 .breakdown-label { font-size: 0.78rem; color: var(--clr-text-muted); width: 120px; flex-shrink: 0; text-transform: capitalize; }
 .breakdown-bar-wrap { flex: 1; height: 6px; background: var(--clr-surface-3); border-radius: 99px; overflow: hidden; }
-.breakdown-bar { height: 100%; background: var(--clr-primary); border-radius: 99px; transition: width 0.6s ease; }
-.breakdown-val { font-size: 0.75rem; font-weight: 700; color: var(--clr-text); width: 30px; text-align: right; }
+.breakdown-bar { height: 100%; border-radius: 99px; transition: width 0.6s ease; }
+.breakdown-val { font-size: 0.75rem; font-weight: 700; color: var(--clr-text); width: 36px; text-align: right; flex-shrink: 0; }
 
 /* Parsed Resume Card */
 .parsed-resume-card {
