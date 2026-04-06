@@ -1,13 +1,12 @@
 <template>
   <div class="post-job-view">
     <div class="content-area">
-      <div class="header-section animate-fade-in-up">
-        <button class="back-btn" @click="goBack">
-          &larr; Back to Jobs
-        </button>
-        <h1 class="page-title mt-4">{{ isEditMode ? 'Edit Hiring Request' : 'Post a Hiring Request' }}</h1>
-        <p class="page-subtitle">{{ isEditMode ? 'Update your job opportunity details.' : 'Publish a comprehensive job opportunity to attract top talent.' }}</p>
-      </div>
+      <PageHeader
+        :title="isEditMode ? 'Edit Hiring Request' : 'Post a Hiring Request'"
+        :subtitle="isEditMode ? 'Update your job opportunity details.' : 'Publish a comprehensive job opportunity to attract top talent.'"
+        backTo="/manage-jobs"
+        backLabel="Back to Jobs"
+      />
 
       <div class="form-card card animate-fade-in-up" style="animation-delay: 0.1s">
         <div v-if="isLoading" class="loading-state">
@@ -162,8 +161,10 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
+import { getJob, createJob, updateJob } from '@/utils/api'
 import AppSpinner from '@/components/AppSpinner.vue'
 import AppAlert from '@/components/AppAlert.vue'
+import PageHeader from '@/components/PageHeader.vue'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -208,25 +209,19 @@ function goBack() {
 async function fetchJobDetails() {
   isLoading.value = true
   try {
-    const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/jobs/${route.params.id}`)
-    const data = await res.json()
-    if (data.status === 'success') {
-      const job = data.job
-      // Populate form data
-      Object.keys(formData.value).forEach(key => {
-        if (job[key] !== undefined) {
-          formData.value[key] = job[key]
-        }
-      })
-      // Map back required documents list to checkboxes
-      if (job.requiredDocumentsList && Array.isArray(job.requiredDocumentsList)) {
-        formData.value.reqResume = job.requiredDocumentsList.includes('Resume/CV')
-        formData.value.reqCoverLetter = job.requiredDocumentsList.includes('Cover Letter')
-        formData.value.reqPortfolio = job.requiredDocumentsList.includes('Portfolio')
+    const data = await getJob(route.params.id)
+    const job = data.job
+    // Populate form data
+    Object.keys(formData.value).forEach(key => {
+      if (job[key] !== undefined) {
+        formData.value[key] = job[key]
       }
-    } else {
-      message.value = 'Failed to load job details.'
-      messageType.value = 'error'
+    })
+    // Map back required documents list to checkboxes
+    if (job.requiredDocumentsList && Array.isArray(job.requiredDocumentsList)) {
+      formData.value.reqResume = job.requiredDocumentsList.includes('Resume/CV')
+      formData.value.reqCoverLetter = job.requiredDocumentsList.includes('Cover Letter')
+      formData.value.reqPortfolio = job.requiredDocumentsList.includes('Portfolio')
     }
   } catch (err) {
     console.error('Fetch job error:', err)
@@ -274,32 +269,23 @@ async function submitJob() {
   const payload = { ...formData.value, requiredDocumentsList: reqDocs }
 
   try {
-    const method = isEditMode.value ? 'PUT' : 'POST'
-    const url = isEditMode.value 
-      ? `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/jobs/${route.params.id}`
-      : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/jobs`
-
-    const res = await fetch(url, {
-      method: method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
-    const data = await res.json()
-    if (data.status === 'success') {
-      message.value = isEditMode.value ? 'Job updated successfully! Redirecting...' : 'Job posted successfully! Redirecting...'
-      messageType.value = 'success'
-      setTimeout(() => {
-        router.push('/manage-jobs')
-      }, 1500)
+    if (isEditMode.value) {
+      await updateJob(route.params.id, payload)
+      message.value = 'Job updated successfully! Redirecting...'
     } else {
-      message.value = data.message || (isEditMode.value ? 'Failed to update job' : 'Failed to post job')
-      messageType.value = 'error'
-      isPosting.value = false
+      await createJob(payload)
+      message.value = 'Job posted successfully! Redirecting...'
     }
+    
+    messageType.value = 'success'
+    setTimeout(() => {
+      router.push('/manage-jobs')
+    }, 1500)
   } catch (err) {
     console.error('Submit job error:', err)
-    message.value = `Network error while trying to ${isEditMode.value ? 'update' : 'post'} job.`
+    message.value = err.message || `Network error while trying to ${isEditMode.value ? 'update' : 'post'} job.`
     messageType.value = 'error'
+  } finally {
     isPosting.value = false
   }
 }
@@ -307,11 +293,6 @@ async function submitJob() {
 
 <style scoped>
 .post-job-view { min-height: 100vh; padding-bottom: 4rem; }
-.header-section { margin-bottom: 2rem; }
-.back-btn { background: none; border: none; font-size: 0.9rem; font-weight: 600; color: var(--clr-primary); cursor: pointer; display: inline-flex; align-items: center; }
-.back-btn:hover { text-decoration: underline; }
-.page-title { font-size: 2rem; font-weight: 800; }
-.page-subtitle { color: var(--clr-text-muted); }
 
 .form-card { padding: 2.5rem; max-width: 900px; margin: 0 auto; }
 
@@ -323,12 +304,6 @@ async function submitJob() {
 .required { color: var(--clr-danger); }
 
 .disabled { background-color: var(--clr-surface-alt); cursor: not-allowed; opacity: 0.8; }
-
-.mb-4 { margin-bottom: 1.25rem; }
-.mt-4 { margin-top: 1.25rem; }
-.mt-8 { margin-top: 3rem; }
-
-.divider { height: 1px; background: var(--clr-border); margin: 2.5rem 0; }
 
 .checkbox-group { display: flex; flex-direction: column; gap: 0.5rem; padding-top: 0.5rem; }
 .checkbox-label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; cursor: pointer; color: var(--clr-text); }

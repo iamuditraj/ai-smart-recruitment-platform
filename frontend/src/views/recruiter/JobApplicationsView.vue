@@ -2,19 +2,15 @@
   <div class="job-apps">
     <div class="content-area">
       <!-- Back link + Header -->
-      <div class="page-header animate-fade-in-up">
-        <div>
-          <router-link to="/manage-jobs" class="back-link" id="back-to-jobs">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
-            Back to Jobs
-          </router-link>
-          <h1 class="page-title">{{ jobTitle }}</h1>
-          <p class="page-subtitle">{{ applications.length }} applicant{{ applications.length !== 1 ? 's' : '' }} for this position</p>
-        </div>
-      </div>
+      <PageHeader
+        :title="jobTitle"
+        :subtitle="`${applications.length} applicant${applications.length !== 1 ? 's' : ''} for this position`"
+        backTo="/manage-jobs"
+        backLabel="Back to Jobs"
+      />
 
       <!-- Bulk Actions Toolbar -->
-      <div class="bulk-toolbar card animate-fade-in-up" style="animation-delay:0.05s" id="bulk-actions">
+      <div class="bulk-toolbar card card--no-hover animate-fade-in-up" style="animation-delay:0.05s" id="bulk-actions">
         <div class="bulk-toolbar__section">
           <span class="bulk-label">Bulk Actions</span>
           <div class="bulk-action-group">
@@ -43,7 +39,7 @@
       </div>
 
       <!-- Applications Table -->
-      <div v-else-if="applications.length > 0" class="apps-table-card card animate-fade-in-up" style="animation-delay:0.1s">
+      <div v-else-if="applications.length > 0" class="apps-table-card card card--no-hover animate-fade-in-up" style="animation-delay:0.1s">
         <div class="table-container">
           <table class="apps-table" id="applications-table">
             <thead>
@@ -51,9 +47,9 @@
                 <th width="70">Rank</th>
                 <th>Candidate</th>
                 <th>Matched Skills</th>
-                <th width="100">ATS Score</th>
-                <th>Status</th>
-                <th width="240">Actions</th>
+                <th style="white-space: nowrap; width: 180px;">ATS SCORE OUT OF 100</th>
+                <th style="padding-left: 1.5rem;">Status</th>
+                <th width="200">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -84,17 +80,11 @@
                 </td>
                 <td>
                   <div class="score-display">
-                    <div class="score-radial">
-                       <svg viewBox="0 0 36 36" class="circular-chart">
-                         <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                         <path class="circle" :class="scoreColorClass(app.ats_score)" :style="`stroke-dasharray: ${app.ats_score || 0}, 100`" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                       </svg>
-                       <span class="score-val">{{ app.ats_score || 0 }}%</span>
-                    </div>
+                    <ScoreRing :score="app.ats_score || 0" :size="90" />
                   </div>
                 </td>
-                <td>
-                  <span class="status-badge" :class="statusClass(app.status)">{{ app.status }}</span>
+                <td style="padding-left: 1.5rem;">
+                  <span class="status-badge" :class="getStatusClass(app.status)">{{ app.status }}</span>
                 </td>
                 <td>
                   <div class="action-group">
@@ -136,7 +126,7 @@
                 <div class="v-modal-meta">
                   <span>{{ selectedApp.candidate_email }}</span>
                   <span class="dot-sep"></span>
-                  <span class="status-badge" :class="statusClass(selectedApp.status)">{{ selectedApp.status }}</span>
+                  <span class="status-badge" :class="getStatusClass(selectedApp.status)">{{ selectedApp.status }}</span>
                 </div>
               </div>
             </div>
@@ -165,60 +155,7 @@
 
           <!-- Parsed Resume Section -->
           <div v-if="selectedApp.parsedResume" class="v-modal-section">
-            <h4 class="section-label">Parsed Resume</h4>
-            <div class="parsed-resume-card">
-              <div v-if="selectedApp.parsedResume.name" class="resume-field">
-                <span class="field-label">Name</span>
-                <span class="field-value">{{ selectedApp.parsedResume.name }}</span>
-              </div>
-              <div v-if="selectedApp.parsedResume.email" class="resume-field">
-                <span class="field-label">Email</span>
-                <span class="field-value">{{ selectedApp.parsedResume.email }}</span>
-              </div>
-              <div v-if="selectedApp.parsedResume.phone" class="resume-field">
-                <span class="field-label">Phone</span>
-                <span class="field-value">{{ selectedApp.parsedResume.phone }}</span>
-              </div>
-              <div v-if="selectedApp.parsedResume.summary" class="resume-field full">
-                <span class="field-label">Summary</span>
-                <span class="field-value">{{ selectedApp.parsedResume.summary }}</span>
-              </div>
-              <div v-if="selectedApp.parsedResume.skills && selectedApp.parsedResume.skills.length" class="resume-field full">
-                <span class="field-label">Skills</span>
-                <div class="skill-stack modal-skills">
-                  <span v-for="s in selectedApp.parsedResume.skills" :key="s" class="v-tag">{{ s }}</span>
-                </div>
-              </div>
-              <div v-if="selectedApp.parsedResume.experience && selectedApp.parsedResume.experience.length" class="resume-field full">
-                <span class="field-label">Experience</span>
-                <div class="exp-list">
-                  <div v-for="(exp, ei) in selectedApp.parsedResume.experience" :key="ei" class="exp-item">
-                    <div class="exp-header">
-                      <strong>{{ exp.title }}</strong>
-                      <span v-if="exp.company"> — {{ exp.company }}</span>
-                    </div>
-                    <span v-if="exp.duration" class="exp-duration">{{ exp.duration }}</span>
-                    <p v-if="exp.description" class="exp-desc">{{ exp.description }}</p>
-                  </div>
-                </div>
-              </div>
-              <div v-if="selectedApp.parsedResume.education && selectedApp.parsedResume.education.length" class="resume-field full">
-                <span class="field-label">Education</span>
-                <div class="exp-list">
-                  <div v-for="(edu, ei) in selectedApp.parsedResume.education" :key="ei" class="exp-item">
-                    <strong>{{ edu.degree }}</strong>
-                    <span v-if="edu.institution"> — {{ edu.institution }}</span>
-                    <span v-if="edu.year" class="exp-duration">{{ edu.year }}</span>
-                  </div>
-                </div>
-              </div>
-              <div v-if="selectedApp.parsedResume.certifications && selectedApp.parsedResume.certifications.length" class="resume-field full">
-                <span class="field-label">Certifications</span>
-                <div class="skill-stack modal-skills">
-                  <span v-for="c in selectedApp.parsedResume.certifications" :key="c" class="v-tag">{{ c }}</span>
-                </div>
-              </div>
-            </div>
+            <ParsedResumeDisplay :parsedResume="selectedApp.parsedResume" />
           </div>
           <div v-else class="v-modal-section">
             <h4 class="section-label">Parsed Resume</h4>
@@ -238,16 +175,18 @@
 import { ref, onMounted } from 'vue'
 import AppModal from '@/components/AppModal.vue'
 import { useRoute } from 'vue-router'
-import { scoreDimensions } from '@/utils/atsConstants'
-import { getBreakdownColor, avatarGrad, initials } from '@/utils/uiHelpers'
+import { avatarGrad, initials, getStatusClass } from '@/utils/uiHelpers'
 import AppSpinner from '@/components/AppSpinner.vue'
 import AppAlert from '@/components/AppAlert.vue'
 import AppEmptyState from '@/components/AppEmptyState.vue'
 import AtsScorePanel from '@/components/AtsScorePanel.vue'
+import PageHeader from '@/components/PageHeader.vue'
+import ScoreRing from '@/components/ScoreRing.vue'
+import ParsedResumeDisplay from '@/components/ParsedResumeDisplay.vue'
+import { getJobApplications, updateApplicationStatus as updateApplicationStatusApi, bulkUpdateStatus as bulkUpdateStatusApi } from '@/utils/api'
 
 const route = useRoute()
 const jobId = route.params.jobId
-const API = import.meta.env.VITE_API_URL || 'http://localhost:5001'
 
 const jobTitle = ref('Loading...')
 const applications = ref([])
@@ -261,16 +200,13 @@ const rejectThreshold = ref(60)
 async function fetchApplications() {
   isLoading.value = true
   try {
-    const res = await fetch(`${API}/api/jobs/${jobId}/applications`)
-    const data = await res.json()
-    if (data.status === 'success') {
-      jobTitle.value = data.job_title
-      applications.value = data.applications.map(app => ({
-        ...app,
-        _avatarGrad: avatarGrad(),
-        _initials: initials(app.candidate_name || app.candidate_email)
-      }))
-    }
+    const data = await getJobApplications(jobId)
+    jobTitle.value = data.job_title
+    applications.value = data.applications.map(app => ({
+      ...app,
+      _avatarGrad: avatarGrad(app.candidate_email),
+      _initials: initials(app.candidate_name || app.candidate_email)
+    }))
   } catch (err) {
     console.error('Fetch applications error:', err)
   } finally {
@@ -280,15 +216,8 @@ async function fetchApplications() {
 
 async function updateStatus(app, newStatus) {
   try {
-    const res = await fetch(`${API}/api/jobs/${jobId}/applications/${app.id}/status`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus })
-    })
-    const data = await res.json()
-    if (data.status === 'success') {
-      app.status = newStatus
-    }
+    await updateApplicationStatusApi(jobId, app.id, newStatus)
+    app.status = newStatus
   } catch (err) {
     console.error('Update status error:', err)
   }
@@ -297,33 +226,15 @@ async function updateStatus(app, newStatus) {
 async function bulkAction(action, threshold, direction) {
   if (!threshold && threshold !== 0) return
   try {
-    const res = await fetch(`${API}/api/jobs/${jobId}/applications/bulk-status`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, threshold, direction })
-    })
-    const data = await res.json()
-    if (data.status === 'success') {
-      // Re-fetch to get updated statuses
-      await fetchApplications()
-      alert(`${data.updated_count} application(s) updated.`)
-    }
+    const data = await bulkUpdateStatusApi(jobId, action, threshold, direction)
+    await fetchApplications()
+    alert(`${data.updated_count} application(s) updated.`)
   } catch (err) {
     console.error('Bulk action error:', err)
   }
 }
 
-function statusClass(status) {
-  if (status === 'Shortlisted') return 'status-approved'
-  if (status === 'Rejected') return 'status-rejected'
-  return 'status-applied'
-}
 
-function scoreColorClass(score) {
-  if (score >= 80) return 'circle-high'
-  if (score >= 50) return 'circle-mid'
-  return 'circle-low'
-}
 
 function generateGmailLink(app) {
   if (!app) return '#'
@@ -338,33 +249,11 @@ onMounted(fetchApplications)
 </script>
 
 <style scoped>
-/* ═══ Page Header ════════════════════════════════════════════ */
-.page-header {
-  margin-bottom: var(--sp-6);
-}
-
-.back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--clr-text-muted);
-  margin-bottom: var(--sp-3);
-  transition: color 0.2s;
-}
-.back-link:hover { color: var(--clr-primary); }
-
-.page-title { font-size: 2.25rem; font-weight: 800; letter-spacing: -0.02em; color: var(--clr-text); font-family: var(--font-heading); }
-.page-subtitle { color: var(--clr-text-muted); margin-top: 0.25rem; font-size: 1.05rem; }
-
 /* ═══ Bulk Toolbar ═══════════════════════════════════════════ */
 .bulk-toolbar {
   margin-bottom: var(--sp-4);
   padding: var(--sp-4) var(--sp-6);
 }
-
-.bulk-toolbar:hover { transform: none; }
 
 .bulk-toolbar__section {
   display: flex;
@@ -447,7 +336,6 @@ onMounted(fetchApplications)
   overflow: hidden;
   border: 1px solid var(--clr-border);
 }
-.apps-table-card:hover { transform: none; }
 
 .table-container { overflow-x: auto; }
 
@@ -518,20 +406,6 @@ onMounted(fetchApplications)
 .v-tag.dim { opacity: 0.5; font-style: italic; }
 .v-tag.gap-tag { color: #ef4444; border-color: rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.08); }
 
-/* Score */
-.score-radial { position: relative; width: 44px; height: 44px; }
-.circular-chart { display: block; max-width: 100%; max-height: 100%; }
-.circle-bg { stroke: var(--clr-surface-3); fill: none; stroke-width: 3.5; }
-.circle { fill: none; stroke-width: 3.5; stroke-linecap: round; transition: stroke-dasharray 1s ease 0.3s; }
-.circle-high { stroke: #10b981; }
-.circle-mid { stroke: #f59e0b; }
-.circle-low { stroke: #ef4444; }
-.score-val {
-  position: absolute; inset: 0;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 0.7rem; font-weight: 800; color: var(--clr-text);
-}
-
 /* Status */
 .status-badge {
   padding: 0.25rem 0.75rem;
@@ -540,12 +414,9 @@ onMounted(fetchApplications)
   font-weight: 700;
   white-space: nowrap;
 }
-.status-applied { background: rgba(245, 158, 11, 0.1); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.2); }
-.status-approved { background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2); }
-.status-rejected { background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); }
 
 /* Action Buttons */
-.action-group { display: flex; align-items: center; gap: 0.4rem; }
+.action-group { display: flex; align-items: center; gap: 0.4rem; justify-content: flex-end; }
 .action-btn {
   display: flex; align-items: center; gap: 0.35rem;
   padding: 0.4rem 0.65rem;
@@ -591,30 +462,6 @@ onMounted(fetchApplications)
 /* Analysis Box */
 
 
-/* Parsed Resume Card */
-.parsed-resume-card {
-  background: var(--clr-surface-2);
-  border: 1px solid var(--clr-border);
-  border-radius: var(--radius-lg);
-  padding: 1.25rem;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-}
-.resume-field.full { grid-column: 1 / -1; }
-.field-label {
-  font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
-  letter-spacing: 0.08em; color: var(--clr-text-muted); margin-bottom: 0.2rem; display: block;
-}
-.field-value { font-size: 0.9rem; color: var(--clr-text); line-height: 1.5; }
-
-/* Experience items */
-.exp-list { display: flex; flex-direction: column; gap: 0.75rem; }
-.exp-item { padding: 0.75rem; background: var(--clr-surface); border-radius: var(--radius-md); border: 1px solid var(--clr-border); }
-.exp-header { font-size: 0.9rem; color: var(--clr-text); }
-.exp-duration { font-size: 0.78rem; color: var(--clr-text-muted); }
-.exp-desc { font-size: 0.82rem; color: var(--clr-text-muted); margin-top: 0.25rem; line-height: 1.5; }
-
 /* Footer */
 .v-modal-footer {
   margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem;
@@ -633,3 +480,5 @@ onMounted(fetchApplications)
   .parsed-resume-card { grid-template-columns: 1fr; }
 }
 </style>
+
+

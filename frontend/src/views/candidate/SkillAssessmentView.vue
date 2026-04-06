@@ -1,17 +1,17 @@
 <template>
   <div class="skill-assessment">
     <div class="content-area">
-      <div class="page-header animate-fade-in-up">
-        <div>
-          <h1 class="page-title">Skill Assessment</h1>
-          <p class="page-subtitle">Auto-generated role-specific technical tests for early-stage evaluation</p>
-        </div>
-        <button class="btn btn-primary" id="generate-test-btn" @click="generateTest" :disabled="isGenerating">
-          <svg v-if="!isGenerating" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-          <span v-else class="loader-sm"></span>
-          {{ isGenerating ? 'Creating AI Test...' : 'Generate AI Test' }}
-        </button>
-      </div>
+      <PageHeader
+        title="Skill Assessment"
+        subtitle="Auto-generated role-specific technical tests for early-stage evaluation">
+        <template #actions>
+          <button class="btn btn-primary" id="generate-test-btn" @click="generateTest" :disabled="isGenerating">
+            <svg v-if="!isGenerating" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            <AppSpinner v-else size="sm" />
+            {{ isGenerating ? 'Creating AI Test...' : 'Generate AI Test' }}
+          </button>
+        </template>
+      </PageHeader>
 
       <!-- Role Selector -->
       <div class="role-selector animate-fade-in-up card" style="animation-delay:0.1s">
@@ -96,8 +96,10 @@
 
 <script setup>
 import { ref, computed, onUnmounted } from 'vue'
-import axios from 'axios'
 import AppEmptyState from '@/components/AppEmptyState.vue'
+import PageHeader from '@/components/PageHeader.vue'
+import AppSpinner from '@/components/AppSpinner.vue'
+import { generateAssessment } from '@/utils/api'
 
 const selectedRole = ref('ml')
 const questions = ref([])
@@ -131,24 +133,20 @@ async function generateTest() {
   isGenerating.value = true
   try {
     const roleObj = roles.find(r => r.id === selectedRole.value)
-    const response = await axios.post('http://localhost:5001/api/generate-assessment', {
-      role: roleObj ? roleObj.name : selectedRole.value
-    })
+    const data = await generateAssessment(roleObj ? roleObj.name : selectedRole.value)
 
-    if (response.data.status === 'success') {
-      questions.value = response.data.questions.map(q => ({ ...q, answer: null }))
-      showResult.value = false
-      timeLeft.value = 600 // 10 minutes for 5 questions
+    questions.value = data.questions.map(q => ({ ...q, answer: null }))
+    showResult.value = false
+    timeLeft.value = 600 // 10 minutes for 5 questions
 
-      if (timerInterval) clearInterval(timerInterval)
-      timerInterval = setInterval(() => {
-        if (timeLeft.value > 0) timeLeft.value--
-        else {
-          clearInterval(timerInterval)
-          submit() // Auto-submit on time out
-        }
-      }, 1000)
-    }
+    if (timerInterval) clearInterval(timerInterval)
+    timerInterval = setInterval(() => {
+      if (timeLeft.value > 0) timeLeft.value--
+      else {
+        clearInterval(timerInterval)
+        submit() // Auto-submit on time out
+      }
+    }, 1000)
   } catch (err) {
     console.error('Failed to generate test:', err)
     alert('Could not generate AI test. Make sure the backend is running.')
@@ -172,17 +170,6 @@ onUnmounted(() => { if (timerInterval) clearInterval(timerInterval) })
 </script>
 
 <style scoped>
-.page-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--sp-4);
-  margin-bottom: var(--sp-8);
-  flex-wrap: wrap;
-}
-.page-title  { font-size: 2rem; font-weight: 800; letter-spacing: -0.02em; }
-.page-subtitle { color: var(--clr-text-muted); margin-top: var(--sp-1); }
-
 /* Role Selector */
 .role-selector {
   margin-bottom: var(--sp-6);

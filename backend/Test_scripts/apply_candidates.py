@@ -2,18 +2,11 @@ import os
 import sys
 import time
 import requests
-
 from werkzeug.security import generate_password_hash
+from test_utils import setup_backend_path, get_firebase_db
 
-BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if BACKEND_DIR not in sys.path:
-    sys.path.append(BACKEND_DIR)
-
-from dotenv import load_dotenv
-load_dotenv(os.path.join(BACKEND_DIR, '.env'))
-
+setup_backend_path()
 from firebase_admin import firestore
-from services.firebase_service import init_firebase, get_db
 
 BASE_URL = "http://127.0.0.1:5001"
 JOB_ID = "4t1pRjLsLcC230Ki6FKf"
@@ -22,8 +15,7 @@ TEST_RESUMES_DIR = os.path.join(os.path.dirname(__file__), "Test resume")
 def ensure_candidate1_exists():
     """Ensure candidate1 exists in the database as requested."""
     print("Checking if candidate1 exists...")
-    init_firebase()
-    db = get_db()
+    db = get_firebase_db()
     if not db:
         print("❌ Could not initialize Firebase.")
         return

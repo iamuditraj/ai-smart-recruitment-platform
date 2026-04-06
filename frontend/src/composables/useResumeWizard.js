@@ -18,8 +18,8 @@ export function useResumeWizard() {
 
     switch (index) {
       case 0:
-        return typeof formData.fullName === 'string' && formData.fullName.trim() !== '' &&
-               typeof formData.email === 'string' && formData.email.trim() !== ''
+        return formData.personal && typeof formData.personal.fullName === 'string' && formData.personal.fullName.trim() !== '' &&
+               typeof formData.personal.email === 'string' && formData.personal.email.trim() !== ''
       case 1:
         return typeof formData.summary === 'string' && formData.summary.trim().length >= 20
       case 2:
@@ -35,7 +35,7 @@ export function useResumeWizard() {
           typeof edu.institution === 'string' && edu.institution.trim() !== ''
         )
       case 4:
-        const skillsArray = formData.technicalSkills || formData.skills
+        const skillsArray = formData.skills && formData.skills.technical
         return Array.isArray(skillsArray) && skillsArray.length >= 2
       case 5:
         const hasProject = Array.isArray(formData.projects) && formData.projects.some(proj => proj && typeof proj.name === 'string' && proj.name.trim() !== '')

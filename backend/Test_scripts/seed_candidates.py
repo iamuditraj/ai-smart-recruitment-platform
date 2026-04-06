@@ -2,21 +2,13 @@ import os
 import sys
 from werkzeug.security import generate_password_hash
 
-# Ensure the backend directory is in the Python path
-BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if BACKEND_DIR not in sys.path:
-    sys.path.append(BACKEND_DIR)
-
-from dotenv import load_dotenv
-load_dotenv(os.path.join(BACKEND_DIR, '.env'))
+from test_utils import setup_backend_path, get_firebase_db
+setup_backend_path()
 
 from firebase_admin import firestore
-from services.firebase_service import init_firebase, get_db
 
 def seed_candidates():
-    # Initialize Firebase using your existing service
-    init_firebase()
-    db = get_db()
+    db = get_firebase_db()
     if not db:
         print("❌ Failed to initialize Firebase. Make sure 'serviceAccountKey.json' is present.")
         return

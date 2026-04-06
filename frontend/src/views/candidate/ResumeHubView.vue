@@ -1,28 +1,29 @@
 <template>
   <div class="resume-hub-view">
     <div class="content-area">
-      <div class="hub-header animate-fade-in-up">
-        <h1 class="hub-title">Resume Hub</h1>
-        <p class="hub-subtitle">Manage, view, and organize all your uploaded and AI-generated resumes.</p>
-      </div>
-
-      <!-- Action Bar -->
-      <div class="action-bar animate-fade-in-up" style="animation-delay: 0.1s">
-        <div class="upload-container">
-          <input type="file" ref="resumeInput" class="hidden-input" accept="application/pdf" @change="handleResumeUpload">
-          <button type="button" class="btn btn-primary" @click="$refs.resumeInput.click()" :disabled="isUploading">
-            <span v-if="!isUploading">
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-              Upload PDF Resume
-            </span>
-            <AppSpinner v-else size="sm" />
-          </button>
-        </div>
-        <RouterLink to="/resume-generation" class="btn btn-outline">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-          Build AI Resume
-        </RouterLink>
-      </div>
+      <PageHeader
+        title="Resume Hub"
+        subtitle="Manage, view, and organize all your uploaded and AI-generated resumes."
+      >
+        <template #actions>
+          <div class="action-bar animate-fade-in-up" style="animation-delay: 0.1s; margin-bottom: 0;">
+            <div class="upload-container">
+              <input type="file" ref="resumeInput" class="hidden-input" accept="application/pdf" @change="handleResumeUpload">
+              <button type="button" class="btn btn-primary" @click="$refs.resumeInput.click()" :disabled="isUploading">
+                <span v-if="!isUploading">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  Upload PDF Resume
+                </span>
+                <AppSpinner v-else size="sm" />
+              </button>
+            </div>
+            <RouterLink to="/resume-generation" class="btn btn-outline">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              Build AI Resume
+            </RouterLink>
+          </div>
+        </template>
+      </PageHeader>
 
       <AppAlert v-if="message" :message="message" :type="messageType" />
 
@@ -78,10 +79,10 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '../../stores/auth'
 import { formatDate } from '@/utils/dateUtils'
-import { viewResume } from '@/utils/resumeUtils'
 import AppSpinner from '@/components/AppSpinner.vue'
 import AppAlert from '@/components/AppAlert.vue'
 import AppEmptyState from '@/components/AppEmptyState.vue'
+import PageHeader from '@/components/PageHeader.vue'
 
 const authStore = useAuthStore()
 const resumes = computed(() => {
@@ -164,14 +165,9 @@ function showMessage(msg, type) {
 
 <style scoped>
 .resume-hub-view { min-height: 100vh; }
-.hub-header { margin-bottom: var(--sp-6); }
-.hub-title { font-size: 2.2rem; font-weight: 800; letter-spacing: -0.02em; }
-.hub-subtitle { color: var(--clr-text-muted); margin-top: var(--sp-1); font-size: 1.05rem; }
-
 .action-bar {
   display: flex;
   gap: var(--sp-4);
-  margin-bottom: var(--sp-8);
   flex-wrap: wrap;
 }
 

@@ -81,7 +81,7 @@
             <div class="profile-actions mt-8">
               <button type="submit" class="btn btn-primary" :disabled="isSaving">
                 <span v-if="!isSaving">Save Changes</span>
-                <span v-else class="loader-sm"></span>
+                <AppSpinner v-else size="sm" />
               </button>
             </div>
           </form>
@@ -195,11 +195,7 @@ onMounted(() => {
   gap: var(--sp-6);
 }
 
-.my-8 { margin-block: 2rem; }
-.mt-8 { margin-top: 2rem; }
-.mt-4 { margin-top: 1rem; }
 .mx-auto { margin-inline: auto; }
-.capitalize { text-transform: capitalize; }
 
 @media (max-width: 1000px) {
   .profile-content {
@@ -217,16 +213,4 @@ onMounted(() => {
     gap: 1rem;
   }
 }
-
-.loader-sm {
-  width: 18px;
-  height: 18px;
-  border: 2px solid rgba(255,255,255,0.2);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  display: inline-block;
-}
-
-@keyframes spin { to { transform: rotate(360deg); } }
 </style>

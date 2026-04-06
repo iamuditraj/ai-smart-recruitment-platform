@@ -2,16 +2,16 @@
   <div class="jobs-view">
     <div class="content-area">
       <!-- Header -->
-      <div class="jobs-header animate-fade-in-up">
-        <div>
-          <h1 class="jobs-title">Available Opportunities</h1>
-          <p class="jobs-subtitle">Find jobs and internships posted by recruiters</p>
-        </div>
-        <div class="search-bar card">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input v-model="searchQuery" type="text" placeholder="Search by title, company or role...">
-        </div>
-      </div>
+      <PageHeader 
+        title="Available Opportunities" 
+        subtitle="Find jobs and internships posted by recruiters">
+        <template #actions>
+          <div class="search-bar card">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input v-model="searchQuery" type="text" placeholder="Search by title, company or role...">
+          </div>
+        </template>
+      </PageHeader>
 
       <!-- Filters -->
       <AppFilterTabs
@@ -33,30 +33,8 @@
       />
 
       <div v-else class="jobs-grid grid animate-fade-in-up" style="animation-delay: 0.2s">
-        <div v-for="job in filteredJobs" :key="job.id" class="job-card card">
-          <div class="job-card__header">
-            <div class="job-company-logo">{{ job.company[0] }}</div>
-            <div class="job-meta">
-              <h3 class="job-title">{{ job.title }}</h3>
-              <p class="job-company">{{ job.company }}</p>
-            </div>
-            <div class="job-type-badge">{{ job.type }}</div>
-          </div>
-
-          <div class="job-details">
-            <div class="detail-item">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-              <span>{{ job.location }}</span>
-            </div>
-            <div class="detail-item">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
-              <span>{{ job.salary }}</span>
-            </div>
-          </div>
-
-          <p class="job-description">{{ job.jobSummary || job.description }}</p>
-
-          <div class="job-actions">
+        <JobCard v-for="job in filteredJobs" :key="job.id" :job="job" :showCompanyInfo="true">
+          <template #actions>
             <button
               v-if="appliedJobIds.has(job.id)"
               class="btn btn-applied w-full"
@@ -71,8 +49,8 @@
             >
               Apply Now
             </button>
-          </div>
-        </div>
+          </template>
+        </JobCard>
       </div>
     </div>
 
@@ -103,13 +81,18 @@
             <div class="modal-pane action-pane">
               <h3 class="font-bold mb-4" style="font-size: 1.25rem;">Application Preview</h3>
               
-              <div v-if="!previewResult && !isPreviewing" class="upload-dropzone">
+              <AppDropzone
+                v-if="!previewResult && !isPreviewing"
+                customClass="upload-dropzone"
+                inputId="browse-jobs-upload"
+                accept=".pdf,.docx,.doc"
+                @files-selected="handlePreviewUpload"
+              >
                  <p class="mb-4 text-center">Upload your resume to see your ATS score before applying.</p>
-                 <label class="btn btn-outline apply-upload-btn w-full">
+                 <label class="btn btn-outline apply-upload-btn w-full" for="browse-jobs-upload">
                    <span>Select Resume (PDF/DOCX)</span>
-                   <input type="file" accept=".pdf,.docx,.doc" class="hidden-input" @change="handlePreviewUpload" />
                  </label>
-              </div>
+              </AppDropzone>
               
               <div v-else-if="isPreviewing" class="scanning-state text-center">
                  <div class="scanner"></div>
@@ -139,11 +122,7 @@
     </AppModal>
 
     <!-- Notification -->
-    <Transition name="fade">
-      <div v-if="toast.show" :class="['toast', toast.type]">
-        {{ toast.message }}
-      </div>
-    </Transition>
+    <AppToast :show="toast.show" :message="toast.message" :type="toast.type" @hide="hideToast" />
   </div>
 </template>
 
@@ -158,6 +137,11 @@ import AppAlert from '@/components/AppAlert.vue'
 import AppEmptyState from '@/components/AppEmptyState.vue'
 import AppFilterTabs from '@/components/AppFilterTabs.vue'
 import AtsScorePanel from '@/components/AtsScorePanel.vue'
+import AppToast from '@/components/AppToast.vue'
+import PageHeader from '@/components/PageHeader.vue'
+import JobCard from '@/components/JobCard.vue'
+import AppDropzone from '@/components/AppDropzone.vue'
+import { getCandidateAppliedJobs, getJobs, previewScore, applyForJob } from '@/utils/api'
 
 const authStore = useAuthStore()
 const jobs = ref([])
@@ -174,22 +158,16 @@ const isSubmitting = ref(false)
 
 
 
-const toast = ref({ show: false, message: '', type: 'success' })
+import { useToast } from '@/composables/useToast'
 
-function showToast(message, type = 'success') {
-  toast.value = { show: true, message, type }
-  setTimeout(() => toast.value.show = false, 3000)
-}
+const { toast, showToast, hideToast } = useToast()
 
 async function fetchAppliedJobs() {
   try {
     const email = authStore.user?.email
     if (!email) return
-    const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/candidate/applied-jobs?email=${encodeURIComponent(email)}`)
-    const data = await res.json()
-    if (data.status === 'success') {
-      appliedJobIds.value = new Set(data.applied_job_ids)
-    }
+    const data = await getCandidateAppliedJobs(email)
+    appliedJobIds.value = new Set(data.applied_job_ids)
   } catch (err) {
     console.error('Fetch applied jobs error:', err)
   }
@@ -197,11 +175,8 @@ async function fetchAppliedJobs() {
 
 async function fetchJobs() {
   try {
-    const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/jobs`)
-    const data = await res.json()
-    if (data.status === 'success') {
-      jobs.value = data.jobs
-    }
+    const data = await getJobs()
+    jobs.value = data.jobs
   } catch (err) {
     console.error('Fetch jobs error:', err)
   } finally {
@@ -240,8 +215,8 @@ function resetPreview() {
   selectedResumeFile.value = null
 }
 
-async function handlePreviewUpload(event) {
-  const file = event.target.files[0];
+async function handlePreviewUpload(filesOrEvent) {
+  const file = filesOrEvent.target ? filesOrEvent.target.files[0] : filesOrEvent[0];
   if (!file) return;
 
   selectedResumeFile.value = file;
@@ -252,22 +227,14 @@ async function handlePreviewUpload(event) {
     formData.append('resume', file);
     formData.append('job_id', selectedJobForApply.value.id);
 
-    const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/jobs/preview_score`, {
-      method: 'POST',
-      body: formData
-    })
+    const data = await previewScore(formData)
     
-    const data = await res.json()
-    if (data.status === 'success') {
-      previewResult.value = data.ats_result
-      parsedResumeResult.value = data.llm_parsed_resume
-    } else {
-      showToast(data.message || 'Failed to generate preview', 'error')
-      selectedResumeFile.value = null
-    }
+    previewResult.value = data.ats_result
+    parsedResumeResult.value = data.llm_parsed_resume
+    showToast('ATS Score generated successfully!', 'success')
   } catch (err) {
     console.error(err)
-    showToast('Failed to connect to server.', 'error')
+    showToast(err.message || 'Failed to connect to server.', 'error')
     selectedResumeFile.value = null
   } finally {
     isPreviewing.value = false;
@@ -292,24 +259,16 @@ async function submitFinalApplication() {
       formData.append('llm_parsed_resume', JSON.stringify(parsedResumeResult.value));
     }
 
-    const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/jobs/apply`, {
-      method: 'POST',
-      body: formData
-    })
+    await applyForJob(formData)
     
-    const data = await res.json()
-    if (data.status === 'success') {
-      showToast('Successfully applied! Your ATS score was saved.')
-      // Mark this job as applied immediately so the button updates
-      appliedJobIds.value = new Set([...appliedJobIds.value, selectedJobForApply.value.id])
-      isSubmitting.value = false
-      selectedJobForApply.value = null
-    } else {
-      showToast(data.message || 'Failed to submit application', 'error')
-    }
+    showToast('Successfully applied! Your ATS score was saved.')
+    // Mark this job as applied immediately so the button updates
+    appliedJobIds.value = new Set([...appliedJobIds.value, selectedJobForApply.value.id])
+    isSubmitting.value = false
+    selectedJobForApply.value = null
   } catch (err) {
     console.error(err)
-    showToast('Failed to apply. Check your connection.', 'error')
+    showToast(err.message || 'Failed to apply. Check your connection.', 'error')
   } finally {
     isSubmitting.value = false;
   }
@@ -323,9 +282,6 @@ onMounted(() => {
 
 <style scoped>
 .jobs-view { min-height: 100vh; background-color: var(--clr-bg); color: var(--clr-text); }
-.jobs-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 2rem; margin-bottom: 2rem; }
-.jobs-title { font-size: 2rem; font-weight: 800; color: var(--clr-text); }
-.jobs-subtitle { color: var(--clr-text-muted); }
 
 .search-bar {
   display: flex;
@@ -347,49 +303,6 @@ onMounted(() => {
 
 
 .jobs-grid { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; }
-.job-card { padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; background: var(--clr-surface); border: 1px solid var(--clr-border); }
-.job-card__header { display: flex; align-items: center; gap: 12px; position: relative; }
-.job-company-logo {
-  width: 48px;
-  height: 48px;
-  background: var(--clr-surface-2);
-  border-radius: var(--radius-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-  font-size: 1.2rem;
-  color: var(--clr-primary);
-  border: 1px solid var(--clr-border);
-}
-.job-meta { flex: 1; }
-.job-title { font-size: 1.1rem; font-weight: 700; color: var(--clr-text); }
-.job-company { font-size: 0.9rem; color: var(--clr-text-muted); }
-.job-type-badge {
-  background: var(--gradient-glow);
-  color: var(--clr-primary);
-  padding: 0.25rem 0.75rem;
-  border-radius: var(--radius-full);
-  font-size: 0.75rem;
-  font-weight: 700;
-  border: 1px solid rgba(99, 102, 241, 0.2);
-}
-
-.job-details { display: flex; gap: 1rem; }
-.detail-item { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--clr-text-light); }
-
-.job-description {
-  font-size: 0.9rem;
-  color: var(--clr-text-muted);
-  line-height: 1.6;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.w-full { width: 100%; }
 
 .btn-applied {
   background: rgba(16, 185, 129, 0.12);
@@ -424,8 +337,6 @@ onMounted(() => {
   text-decoration: underline;
   color: var(--clr-text);
 }
-.mt-2 { margin-top: 0.5rem; }
-.text-sm { font-size: 0.85rem; }
 
 /* Modal Integration Styles */
 :deep(.apply-modal) {
@@ -480,9 +391,6 @@ onMounted(() => {
   background: var(--clr-surface-2);
   color: var(--clr-text);
 }
-.badge.badge-success { background: rgba(16, 185, 129, 0.2); color: #10B981; }
-.badge.badge-warning { background: rgba(245, 158, 11, 0.2); color: #F59E0B; }
-.badge.badge-danger { background: rgba(239, 68, 68, 0.2); color: #EF4444; }
 
 .job-desc {
   font-size: 0.95rem;
@@ -530,25 +438,4 @@ onMounted(() => {
 
 
 .jobs-loading { text-align: center; padding: 4rem; }
-
-
-
-
-.toast {
-  position: fixed;
-  bottom: 2rem;
-  right: 2rem;
-  padding: 1rem 2rem;
-  border-radius: var(--radius-md);
-  color: white;
-  font-weight: 600;
-  box-shadow: var(--shadow-lg);
-  z-index: 9999;
-}
-.toast.success { background: var(--clr-success); }
-.toast.error { background: var(--clr-danger); }
-
-@keyframes spin { to { transform: rotate(360deg); } }
-.fade-enter-active, .fade-leave-active { transition: opacity 0.5s; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
 </style>
