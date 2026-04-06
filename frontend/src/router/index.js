@@ -31,13 +31,21 @@ const router = createRouter({
     {
       path: '/profile',
       name: 'profile',
-      component: () => import('../views/shared/ProfileWrapper.vue'),
+      component: () => import('../components/RoleWrapper.vue'),
+      props: {
+        recruiterComponent: '../views/recruiter/RecruiterProfileView.vue',
+        candidateComponent: '../views/candidate/CandidateProfileView.vue'
+      },
       meta: { title: 'My Profile — HireAI', requiresAuth: true },
     },
     {
       path: '/dashboard',
       name: 'dashboard',
-      component: () => import('../views/shared/DashboardWrapper.vue'),
+      component: () => import('../components/RoleWrapper.vue'),
+      props: {
+        recruiterComponent: '../views/recruiter/DashboardView.vue',
+        candidateComponent: '../views/candidate/CandidateDashboardView.vue'
+      },
       meta: { title: 'Dashboard — HireAI', requiresAuth: true },
     },
 

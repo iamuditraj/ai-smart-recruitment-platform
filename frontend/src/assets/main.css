@@ -236,12 +236,40 @@ select {
   gap: var(--sp-8);
 }
 
+.gap-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.mt-2 { margin-top: 0.5rem; }
+.mt-4 { margin-top: 1rem; }
+.mt-8 { margin-top: 2rem; }
+.mb-4 { margin-bottom: 1rem; }
+.my-8 { margin-block: 2rem; }
+
+.w-full { width: 100%; }
+
+.items-start { align-items: flex-start; }
+
 .grid {
   display: grid;
 }
 
 .text-center {
   text-align: center;
+}
+
+.capitalize {
+  text-transform: capitalize;
+}
+
+.text-sm {
+  font-size: 0.85rem;
+}
+
+.font-bold {
+  font-weight: 700;
 }
 
 .text-muted {
@@ -276,6 +304,10 @@ select {
   border-color: var(--clr-border-hover);
   box-shadow: var(--shadow-md);
   transform: translateY(-2px);
+}
+
+.card--no-hover {
+  transform: none !important;
 }
 
 /* ===== Buttons ===== */
@@ -358,6 +390,16 @@ select {
   border: 1px solid rgba(245, 158, 11, 0.25);
 }
 
+.badge-danger {
+  background: rgba(239, 68, 68, 0.12);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.status-approved, .status-shortlisted { background: rgba(16, 185, 129, 0.12); color: #10b981; }
+.status-applied, .status-pending { background: rgba(245, 158, 11, 0.12); color: #f59e0b; }
+.status-rejected { background: rgba(239, 68, 68, 0.12); color: #ef4444; }
+
 /* ===== Form Elements ===== */
 .form-group {
   display: flex;
@@ -399,6 +441,10 @@ select {
   background: var(--clr-border);
   width: 100%;
 }
+
+/* ===== Links ===== */
+.link-primary { color: var(--clr-primary); font-weight: 600; text-decoration: none; }
+.link-primary:hover { text-decoration: underline; }
 
 /* ===== Animations ===== */
 @keyframes fade-in-up {

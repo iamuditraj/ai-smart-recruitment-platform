@@ -2,38 +2,38 @@
   <div class="my-apps">
     <div class="content-area">
       <!-- Header -->
-      <div class="page-header animate-fade-in-up">
-        <div>
-          <h1 class="page-title">My Applications</h1>
-          <p class="page-subtitle">Track all jobs you've applied to and their current status</p>
-        </div>
-        <div class="stats-row">
-          <KpiCard
-            label="Total"
-            :value="applications.length"
-            variant="simple"
-            style="flex: 1;"
-          />
-          <KpiCard
-            label="Shortlisted"
-            :value="statusCounts.Shortlisted"
-            variant="simple"
-            style="flex: 1; --clr-text: #10b981;"
-          />
-          <KpiCard
-            label="Pending"
-            :value="statusCounts.Applied"
-            variant="simple"
-            style="flex: 1; --clr-text: #f59e0b;"
-          />
-          <KpiCard
-            label="Rejected"
-            :value="statusCounts.Rejected"
-            variant="simple"
-            style="flex: 1; --clr-text: #ef4444;"
-          />
-        </div>
-      </div>
+      <PageHeader
+        title="My Applications"
+        subtitle="Track all jobs you've applied to and their current status">
+        <template #actions>
+          <div class="stats-row">
+            <KpiCard
+              label="Total"
+              :value="applications.length"
+              variant="simple"
+              style="flex: 1;"
+            />
+            <KpiCard
+              label="Shortlisted"
+              :value="statusCounts.Shortlisted"
+              variant="simple"
+              style="flex: 1; --clr-text: #10b981;"
+            />
+            <KpiCard
+              label="Pending"
+              :value="statusCounts.Applied"
+              variant="simple"
+              style="flex: 1; --clr-text: #f59e0b;"
+            />
+            <KpiCard
+              label="Rejected"
+              :value="statusCounts.Rejected"
+              variant="simple"
+              style="flex: 1; --clr-text: #ef4444;"
+            />
+          </div>
+        </template>
+      </PageHeader>
 
       <!-- Filter Tabs -->
       <AppFilterTabs
@@ -74,15 +74,11 @@
 
             <!-- ATS Score -->
             <div class="score-ring">
-              <svg viewBox="0 0 36 36" class="circular-chart">
-                <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                <path class="circle" :class="scoreClass(app.ats_score)" :style="`stroke-dasharray: ${app.ats_score || 0}, 100`" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-              </svg>
-              <span class="score-text">{{ app.ats_score || 0 }}%</span>
+              <ScoreRing :score="app.ats_score || 0" :size="52" />
             </div>
 
             <!-- Status Badge -->
-            <span class="status-badge" :class="statusBadgeClass(app.status)">
+            <span class="status-badge" :class="getStatusClass(app.status)">
               <span class="status-dot"></span>
               {{ app.status }}
             </span>
@@ -112,9 +108,12 @@ import AppAlert from '@/components/AppAlert.vue'
 import AppEmptyState from '@/components/AppEmptyState.vue'
 import AppFilterTabs from '@/components/AppFilterTabs.vue'
 import KpiCard from '@/components/KpiCard.vue'
+import PageHeader from '@/components/PageHeader.vue'
+import ScoreRing from '@/components/ScoreRing.vue'
+import { getCandidateApplications } from '@/utils/api'
+import { avatarGrad, getStatusClass } from '@/utils/uiHelpers'
 
 const authStore = useAuthStore()
-const API = import.meta.env.VITE_API_URL || 'http://localhost:5001'
 
 const applications = ref([])
 const isLoading = ref(true)
@@ -138,11 +137,8 @@ async function fetchApplications() {
   try {
     const email = authStore.user?.email
     if (!email) return
-    const res = await fetch(`${API}/api/candidate/applications?email=${encodeURIComponent(email)}`)
-    const data = await res.json()
-    if (data.status === 'success') {
-      applications.value = data.applications
-    }
+    const data = await getCandidateApplications(email)
+    applications.value = data.applications
   } catch (err) {
     console.error('Fetch applications error:', err)
   } finally {
@@ -150,45 +146,16 @@ async function fetchApplications() {
   }
 }
 
-function avatarGrad(name) {
-  // Deterministic gradient from name
-  let hash = 0
-  for (let i = 0; i < (name || '').length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
-  const h1 = Math.abs(hash % 360)
-  const h2 = (h1 + 40) % 360
-  return `linear-gradient(135deg, hsl(${h1}, 70%, 55%), hsl(${h2}, 80%, 45%))`
-}
-
-
-
 function scoreClass(score) {
   if (score >= 80) return 'circle-high'
   if (score >= 50) return 'circle-mid'
   return 'circle-low'
 }
 
-function statusBadgeClass(status) {
-  if (status === 'Shortlisted') return 'badge-approved'
-  if (status === 'Rejected') return 'badge-rejected'
-  return 'badge-pending'
-}
-
 onMounted(fetchApplications)
 </script>
 
 <style scoped>
-/* ═══ Header ═════════════════════════════════════════════════ */
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 2rem;
-  margin-bottom: var(--sp-6);
-  flex-wrap: wrap;
-}
-.page-title { font-size: 2.25rem; font-weight: 800; letter-spacing: -0.02em; font-family: var(--font-heading); }
-.page-subtitle { color: var(--clr-text-muted); margin-top: 0.25rem; font-size: 1.05rem; }
-
 /* Stats Row */
 .stats-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
 
@@ -246,20 +213,6 @@ onMounted(fetchApplications)
 .contact-link { font-size: 0.85rem; font-weight: 600; color: var(--clr-primary); text-decoration: none; }
 .contact-link:hover { text-decoration: underline; }
 
-/* Score Ring */
-.score-ring { position: relative; width: 52px; height: 52px; }
-.circular-chart { display: block; max-width: 100%; max-height: 100%; }
-.circle-bg { stroke: var(--clr-surface-3); fill: none; stroke-width: 3; }
-.circle { fill: none; stroke-width: 3; stroke-linecap: round; transition: stroke-dasharray 1s ease 0.3s; }
-.circle-high { stroke: #10b981; }
-.circle-mid { stroke: #f59e0b; }
-.circle-low { stroke: #ef4444; }
-.score-text {
-  position: absolute; inset: 0;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 0.72rem; font-weight: 800; color: var(--clr-text);
-}
-
 /* Status Badge */
 .status-badge {
   display: inline-flex;
@@ -272,19 +225,10 @@ onMounted(fetchApplications)
   white-space: nowrap;
 }
 .status-dot { width: 7px; height: 7px; border-radius: 50%; }
-.badge-approved { background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2); }
-.badge-approved .status-dot { background: #10b981; }
-.badge-pending { background: rgba(245, 158, 11, 0.1); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.2); }
-.badge-pending .status-dot { background: #f59e0b; }
-.badge-rejected { background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); }
-.badge-rejected .status-dot { background: #ef4444; }
 
 /* ═══ Loading & Empty ════════════════════════════════════════ */
 .loading-box, .empty-box { text-align: center; padding: 4rem 2rem; }
 .loading-box:hover, .empty-box:hover { transform: none; }
-
-
-.link-primary { color: var(--clr-primary); font-weight: 600; }
 
 /* ═══ Responsive ═════════════════════════════════════════════ */
 @media (max-width: 768px) {

@@ -2,12 +2,10 @@
   <div class="mock-interview">
     <div class="content-area">
       <!-- ====== Header ====== -->
-      <div class="page-header animate-fade-in-up">
-        <div>
-          <h1 class="page-title">AI Mock Interview</h1>
-          <p class="page-subtitle">Practice with our AI interviewer and receive real-time feedback on your performance</p>
-        </div>
-      </div>
+      <PageHeader
+        title="AI Mock Interview"
+        subtitle="Practice with our AI interviewer and receive real-time feedback on your performance"
+      />
 
       <!-- ====== STAGE 0: Setup & Intro ====== -->
       <div v-if="stage === 'setup'" class="setup-container card animate-fade-in-up">
@@ -30,7 +28,7 @@
             <div class="video-window">
               <video ref="setupVideo" autoplay muted playsinline class="preview-video"></video>
               <div v-if="!isMediaReady" class="video-overlay">
-                <span class="loader-sm"></span>
+                <AppSpinner size="sm" />
                 <span>Accessing Camera...</span>
               </div>
             </div>
@@ -183,6 +181,8 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import PageHeader from '@/components/PageHeader.vue'
+import AppSpinner from '@/components/AppSpinner.vue'
 
 const stage = ref('setup') // 'setup' | 'active' | 'analysis'
 const isMediaReady = ref(false)

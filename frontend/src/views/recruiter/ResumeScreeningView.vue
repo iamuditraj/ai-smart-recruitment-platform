@@ -1,22 +1,18 @@
 <template>
   <div class="resume-screening">
     <div class="content-area">
-      <div class="page-header animate-fade-in-up">
-        <div>
-          <h1 class="page-title">Resume Screening</h1>
-          <p class="page-subtitle">Upload resumes and let AI extract, parse, and score candidates</p>
-        </div>
-      </div>
+      <PageHeader
+        title="Resume Screening"
+        subtitle="Upload resumes and let AI extract, parse, and score candidates"
+      />
 
       <!-- Upload Zone -->
-      <div
-        class="upload-zone card animate-fade-in-up"
-        :class="{ 'upload-zone--active': isDragging, 'upload-zone--has-files': files.length }"
-        style="animation-delay:0.1s"
-        @dragover.prevent="isDragging = true"
-        @dragleave="isDragging = false"
-        @drop.prevent="onDrop"
-        id="resume-upload-zone"
+      <AppDropzone
+        inputId="file-input"
+        :multiple="true"
+        accept=".pdf,.docx,.doc"
+        customClass="animate-fade-in-up"
+        @files-selected="handleFiles"
       >
         <div class="upload-zone__icon animate-float">
           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="url(#uploadGrad)" stroke-width="1.5">
@@ -35,15 +31,7 @@
         <label class="btn btn-outline upload-zone__btn" for="file-input" id="resume-file-label">
           Browse Files
         </label>
-        <input
-          id="file-input"
-          type="file"
-          multiple
-          accept=".pdf,.docx,.doc"
-          class="upload-zone__input"
-          @change="onFileChange"
-        />
-      </div>
+      </AppDropzone>
 
       <!-- Job Description -->
       <div class="job-desc-section card animate-fade-in-up" style="animation-delay:0.2s">
@@ -63,7 +51,7 @@
           @click="analyze"
         >
           <svg v-if="!isAnalyzing" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <span v-else class="loader-sm"></span>
+          <AppSpinner v-else size="sm" />
           {{ isAnalyzing ? 'Analyzing...' : `Analyze Resumes (${files.length})` }}
         </button>
       </div>
@@ -112,20 +100,7 @@
               </div>
             </div>
             <div class="result-card__score">
-              <div class="score-ring">
-                <svg viewBox="0 0 36 36" class="score-ring__svg">
-                  <path class="score-ring__bg"
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                    fill="none" stroke="#1f2540" stroke-width="3"/>
-                  <path class="score-ring__fill"
-                    :style="`stroke-dasharray: ${r.score}, 100; stroke: ${r.score >= 80 ? '#10b981' : r.score >= 60 ? '#f59e0b' : '#ef4444'}`"
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                    fill="none" stroke-width="3" stroke-linecap="round"/>
-                </svg>
-                <span class="score-ring__label" :class="r.score >= 80 ? 'high' : r.score >= 60 ? 'mid' : 'low'">
-                  {{ r.score }}%
-                </span>
-              </div>
+              <ScoreRing :score="r.score" :size="64" />
               <span class="score-ring__text">ATS Score</span>
             </div>
           </div>
@@ -137,21 +112,19 @@
 
 <script setup>
 import { ref } from 'vue'
-import axios from 'axios'
+import { analyzeResumes } from '@/utils/api'
+import PageHeader from '@/components/PageHeader.vue'
+import ScoreRing from '@/components/ScoreRing.vue'
+import AppSpinner from '@/components/AppSpinner.vue'
+import AppDropzone from '@/components/AppDropzone.vue'
 
-const isDragging = ref(false)
 const files = ref([])
 const jobDescription = ref('')
 const results = ref([])
 const isAnalyzing = ref(false)
 
-function onFileChange(e) {
-  files.value = Array.from(e.target.files)
-}
-
-function onDrop(e) {
-  isDragging.value = false
-  files.value = Array.from(e.dataTransfer.files)
+function handleFiles(newFiles) {
+  files.value = newFiles
 }
 
 async function analyze() {
@@ -165,19 +138,12 @@ async function analyze() {
     })
     formData.append('jobDescription', jobDescription.value)
 
-    const response = await axios.post('http://localhost:5001/api/analyze', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    })
-
-    if (response.data.status === 'success') {
-      results.value = response.data.results
-      console.log('✅ Analysis complete:', response.data.message)
-    }
+    const data = await analyzeResumes(formData)
+    results.value = data.results
+    console.log('✅ Analysis complete:', data.message)
   } catch (error) {
     console.error('❌ Error calling backend:', error)
-    alert('Could not connect to the Flask backend. Please make sure it is running.')
+    alert(error.message || 'Could not connect to the backend. Please make sure it is running.')
   } finally {
     isAnalyzing.value = false
   }
@@ -185,21 +151,6 @@ async function analyze() {
 </script>
 
 <style scoped>
-.page-header {
-  margin-bottom: var(--sp-8);
-}
-
-.page-title {
-  font-size: 2rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-
-.page-subtitle {
-  color: var(--clr-text-muted);
-  margin-top: var(--sp-1);
-}
-
 /* Upload Zone */
 .upload-zone {
   display: flex;
@@ -369,12 +320,6 @@ async function analyze() {
   color: var(--clr-text-muted);
 }
 
-.badge-danger {
-  background: rgba(239,68,68,0.12);
-  color: #fca5a5;
-  border: 1px solid rgba(239,68,68,0.25);
-}
-
 /* Score Ring */
 .result-card__score {
   display: flex;
@@ -383,36 +328,6 @@ async function analyze() {
   gap: var(--sp-1);
   flex-shrink: 0;
 }
-
-.score-ring {
-  position: relative;
-  width: 64px;
-  height: 64px;
-}
-
-.score-ring__svg {
-  width: 100%;
-  height: 100%;
-  transform: rotate(-90deg);
-}
-
-.score-ring__fill {
-  transition: stroke-dasharray 1s ease;
-}
-
-.score-ring__label {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.8rem;
-  font-weight: 800;
-}
-
-.score-ring__label.high { color: #6ee7b7; }
-.score-ring__label.mid  { color: #fcd34d; }
-.score-ring__label.low  { color: #fca5a5; }
 
 .score-ring__text {
   font-size: 0.72rem;
@@ -461,19 +376,6 @@ async function analyze() {
   background: rgba(239, 68, 68, 0.1);
   border: 1px solid rgba(239, 68, 68, 0.25);
   color: #fca5a5;
-}
-
-.loader-sm {
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-radius: 50%;
-  border-top-color: #fff;
-  animation: spin 1s ease-in-out infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
 }
 
 @media (max-width: 600px) {

@@ -11,10 +11,21 @@ export const getBreakdownColor = (score, max) => {
   return '#ef4444'
 }
 
-export function avatarGrad() {
-  return `linear-gradient(135deg, #${Math.floor(Math.random()*16777215).toString(16).padStart(6,'0')}, #${Math.floor(Math.random()*16777215).toString(16).padStart(6,'0')})`
+export function avatarGrad(seed) {
+  let hash = 0
+  for (let i = 0; i < (seed || '').length; i++) hash = seed.charCodeAt(i) + ((hash << 5) - hash)
+  const h1 = Math.abs(hash % 360)
+  const h2 = (h1 + 40) % 360
+  return `linear-gradient(135deg, hsl(${h1}, 70%, 55%), hsl(${h2}, 80%, 45%))`
 }
 
 export function initials(name) {
   return (name || '?').split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2)
+}
+
+export function getStatusClass(status) {
+  if (status === 'Shortlisted' || status === 'Approved') return 'status-approved'
+  if (status === 'Rejected') return 'status-rejected'
+  if (status === 'Applied') return 'status-applied'
+  return 'status-pending'
 }
