@@ -1,6 +1,6 @@
 <template>
-  <div class="skill-assessment section">
-    <div class="container">
+  <div class="skill-assessment">
+    <div class="content-area">
       <div class="page-header animate-fade-in-up">
         <div>
           <h1 class="page-title">Skill Assessment</h1>

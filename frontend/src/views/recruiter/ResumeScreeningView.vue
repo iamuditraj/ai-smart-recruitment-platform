@@ -1,6 +1,6 @@
 <template>
-  <div class="resume-screening section">
-    <div class="container">
+  <div class="resume-screening">
+    <div class="content-area">
       <div class="page-header animate-fade-in-up">
         <div>
           <h1 class="page-title">Resume Screening</h1>

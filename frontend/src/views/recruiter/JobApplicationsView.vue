@@ -1,6 +1,6 @@
 <template>
-  <div class="job-apps section">
-    <div class="container--fluid">
+  <div class="job-apps">
+    <div class="content-area">
       <!-- Back link + Header -->
       <div class="page-header animate-fade-in-up">
         <div>
