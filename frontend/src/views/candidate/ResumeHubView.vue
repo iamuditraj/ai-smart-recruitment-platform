@@ -15,7 +15,7 @@
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
               Upload PDF Resume
             </span>
-            <span v-else class="loader-sm"></span>
+            <AppSpinner v-else size="sm" />
           </button>
         </div>
         <RouterLink to="/resume-generation" class="btn btn-outline">
@@ -24,19 +24,20 @@
         </RouterLink>
       </div>
 
-      <div v-if="message" :class="['message-banner', messageType, 'animate-fade-in-up']" style="animation-delay: 0.15s">
-        {{ message }}
-      </div>
+      <AppAlert v-if="message" :message="message" :type="messageType" />
 
       <!-- Resume List -->
       <div class="resume-grid animate-fade-in-up" style="animation-delay: 0.2s">
-        <div v-if="!resumes.length" class="empty-state">
-          <div class="empty-icon">
+        <AppEmptyState
+          v-if="!resumes.length"
+          title="No resumes yet"
+          description="Upload a PDF or use our AI builder to create your first resume."
+          :showCard="false"
+        >
+          <template #icon>
             <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-          </div>
-          <h3>No resumes yet</h3>
-          <p class="text-muted">Upload a PDF or use our AI builder to create your first resume.</p>
-        </div>
+          </template>
+        </AppEmptyState>
 
         <div v-else class="resume-card" v-for="resume in resumes" :key="resume.id || resume.resume_id" :class="{ 'is-default': resume.isDefault }">
           <div class="resume-card-header">
@@ -76,6 +77,11 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '../../stores/auth'
+import { formatDate } from '@/utils/dateUtils'
+import { viewResume } from '@/utils/resumeUtils'
+import AppSpinner from '@/components/AppSpinner.vue'
+import AppAlert from '@/components/AppAlert.vue'
+import AppEmptyState from '@/components/AppEmptyState.vue'
 
 const authStore = useAuthStore()
 const resumes = computed(() => {
@@ -103,11 +109,7 @@ function getResumeId(resume) {
   return resume.id || resume.resume_id || resume.uploadedAt || null
 }
 
-function formatDate(isoString) {
-  if (!isoString) return 'Unknown date'
-  const d = new Date(isoString)
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
+
 
 async function handleResumeUpload(event) {
   const file = event.target.files[0]
@@ -151,24 +153,7 @@ async function setAsDefault(id) {
   }
 }
 
-function viewResume(dataUri) {
-  if (!dataUri) return
 
-  try {
-    const base64 = dataUri.split(',')[1]
-    const binary = atob(base64)
-    const array = []
-    for (let i = 0; i < binary.length; i++) {
-      array.push(binary.charCodeAt(i))
-    }
-    const blob = new Blob([new Uint8Array(array)], { type: 'application/pdf' })
-    const url = URL.createObjectURL(blob)
-    window.open(url, '_blank')
-  } catch (error) {
-    console.error('Error viewing resume:', error)
-    window.open(dataUri, '_blank')
-  }
-}
 
 function showMessage(msg, type) {
   message.value = msg
@@ -198,45 +183,10 @@ function showMessage(msg, type) {
   display: none;
 }
 
-.message-banner {
-  padding: 1rem;
-  border-radius: var(--radius-md);
-  margin-bottom: 1.5rem;
-  font-weight: 600;
-  text-align: center;
-  font-size: 0.9rem;
-}
-.message-banner.success {
-  background: rgba(16, 185, 129, 0.1);
-  color: var(--clr-success);
-  border: 1px solid rgba(16, 185, 129, 0.2);
-}
-.message-banner.error {
-  background: rgba(239, 68, 68, 0.1);
-  color: var(--clr-danger);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-}
-
 .resume-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: var(--sp-6);
-}
-
-.empty-state {
-  grid-column: 1 / -1;
-  text-align: center;
-  padding: 4rem 2rem;
-  background: var(--clr-surface);
-  border: 1px dashed var(--clr-border-hover);
-  border-radius: var(--radius-lg);
-}
-.empty-icon {
-  color: var(--clr-text-muted);
-  opacity: 0.5;
-  margin-bottom: 1rem;
-  display: flex;
-  justify-content: center;
 }
 
 .resume-card {
@@ -347,15 +297,6 @@ function showMessage(msg, type) {
   height: 14px;
   border: 2px solid rgba(99, 102, 241, 0.2);
   border-top-color: var(--clr-primary);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  display: inline-block;
-}
-.loader-sm {
-  width: 18px;
-  height: 18px;
-  border: 2px solid rgba(255,255,255,0.2);
-  border-top-color: #fff;
   border-radius: 50%;
   animation: spin 1s linear infinite;
   display: inline-block;

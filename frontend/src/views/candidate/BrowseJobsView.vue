@@ -14,27 +14,23 @@
       </div>
 
       <!-- Filters -->
-      <div class="filters-row animate-fade-in-up" style="animation-delay: 0.1s">
-        <button
-          v-for="f in ['All', 'Full-time', 'Internship', 'Remote']"
-          :key="f"
-          @click="activeFilter = f"
-          :class="['filter-btn', { active: activeFilter === f }]"
-        >
-          {{ f }}
-        </button>
-      </div>
+      <AppFilterTabs
+        v-model="activeFilter"
+        :tabs="['All', 'Full-time', 'Internship', 'Remote']"
+      />
 
       <!-- Jobs Grid -->
       <div v-if="isLoading" class="jobs-loading">
-        <div class="loader-lg"></div>
+        <AppSpinner size="lg" />
         <p>Fetching opportunities...</p>
       </div>
 
-      <div v-else-if="filteredJobs.length === 0" class="empty-state card">
-        <h3>No opportunities found</h3>
-        <p>Try adjusting your search or filters.</p>
-      </div>
+      <AppEmptyState
+        v-else-if="filteredJobs.length === 0"
+        icon="🔍"
+        title="No opportunities found"
+        description="Try adjusting your search or filters."
+      />
 
       <div v-else class="jobs-grid grid animate-fade-in-up" style="animation-delay: 0.2s">
         <div v-for="job in filteredJobs" :key="job.id" class="job-card card">
@@ -122,55 +118,18 @@
               </div>
               
               <div v-else-if="previewResult" class="preview-results">
-                  <div class="ats-overall">
-                    <div class="ats-score-header">
-                      <div class="flex items-center">
-                        <span class="ats-score-number" :style="{ color: getScoreColor(previewResult.score) }">{{ previewResult.score }}</span>
-                        <span class="ats-score-denom">/100</span>
-                      </div>
-                      <span :class="['badge', previewResult.badgeClass]">{{ previewResult.status }}</span>
-                    </div>
-                    <div class="ats-main-bar">
-                      <div class="ats-main-bar-fill" :style="{ width: previewResult.score + '%', backgroundColor: getScoreColor(previewResult.score) }"></div>
-                    </div>
-
-                    <div class="breakdown-section">
-                      <h4 class="breakdown-title">Score Breakdown</h4>
-                      <div v-for="dim in scoreDimensions" :key="dim.key" class="breakdown-row">
-                        <span class="breakdown-label">{{ dim.label }}</span>
-                        <div class="breakdown-bar-track">
-                          <div 
-                            class="breakdown-bar-fill" 
-                            :style="{ 
-                              width: ((previewResult.score_breakdown?.[dim.key] || 0) / dim.max * 100) + '%',
-                              backgroundColor: getBreakdownColor(previewResult.score_breakdown?.[dim.key] || 0, dim.max)
-                            }"
-                          ></div>
-                        </div>
-                        <span class="breakdown-score">{{ previewResult.score_breakdown?.[dim.key] || 0 }}/{{ dim.max }}</span>
-                      </div>
-                    </div>
-
-                    <div v-if="previewResult.matched_skills?.length" class="skills-section">
-                      <h4 class="breakdown-title">Matched Skills</h4>
-                      <div class="chips-row">
-                        <span v-for="skill in previewResult.matched_skills.slice(0, 6)" :key="skill" class="chip chip-green">{{ skill }}</span>
-                        <span v-if="previewResult.matched_skills.length > 6" class="chip chip-more">+{{ previewResult.matched_skills.length - 6 }} more</span>
-                      </div>
-                    </div>
-
-                    <div v-if="previewResult.key_gaps?.length" class="skills-section">
-                      <h4 class="breakdown-title">Missing Keywords</h4>
-                      <div class="chips-row">
-                        <span v-for="gap in previewResult.key_gaps.slice(0, 5)" :key="gap" class="chip chip-red">{{ gap }}</span>
-                      </div>
-                    </div>
-                  </div>
+                  <AtsScorePanel
+                    v-if="previewResult"
+                    :score="previewResult.score || previewResult.ats_score"
+                    :breakdown="previewResult.score_breakdown"
+                    :matchedSkills="previewResult.matched_skills"
+                    :missingSkills="previewResult.key_gaps || previewResult.missing_skills"
+                  />
 
                   <div class="submit-section">
                     <button class="btn btn-primary w-full" @click="submitFinalApplication" :disabled="isSubmitting">
                       <span v-if="!isSubmitting">Submit Official Application</span>
-                      <span v-else class="loader-sm"></span>
+                      <AppSpinner v-else size="sm" />
                     </button>
                     <button class="btn-text w-full" @click="resetPreview" :disabled="isSubmitting">Upload Different Resume</button>
                   </div>
@@ -192,6 +151,13 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '../../stores/auth'
 import AppModal from '@/components/AppModal.vue'
+import { scoreDimensions } from '@/utils/atsConstants'
+import { getScoreColor, getBreakdownColor } from '@/utils/uiHelpers'
+import AppSpinner from '@/components/AppSpinner.vue'
+import AppAlert from '@/components/AppAlert.vue'
+import AppEmptyState from '@/components/AppEmptyState.vue'
+import AppFilterTabs from '@/components/AppFilterTabs.vue'
+import AtsScorePanel from '@/components/AtsScorePanel.vue'
 
 const authStore = useAuthStore()
 const jobs = ref([])
@@ -206,29 +172,7 @@ const isPreviewing = ref(false)
 const appliedJobIds = ref(new Set())
 const isSubmitting = ref(false)
 
-const scoreDimensions = [
-  { key: "required_skills",    label: "Required Skills",    max: 30 },
-  { key: "experience_years",   label: "Experience",         max: 20 },
-  { key: "preferred_skills",   label: "Preferred Skills",   max: 15 },
-  { key: "education",          label: "Education",          max: 10 },
-  { key: "job_title_match",    label: "Job Title Match",    max: 10 },
-  { key: "certifications",     label: "Certifications",     max:  8 },
-  { key: "keyword_density",    label: "Keyword Density",    max:  4 },
-  { key: "resume_completeness",label: "Completeness",       max:  3 },
-]
 
-const getBreakdownColor = (score, max) => {
-  const ratio = max > 0 ? score / max : 0
-  if (ratio >= 0.75) return '#10b981'
-  if (ratio >= 0.4)  return '#f59e0b'
-  return '#ef4444'
-}
-
-const getScoreColor = (score) => {
-  if (score >= 80) return '#10b981'
-  if (score >= 60) return '#f59e0b'
-  return '#ef4444'
-}
 
 const toast = ref({ show: false, message: '', type: 'success' })
 
@@ -400,22 +344,7 @@ onMounted(() => {
   outline: none;
 }
 
-.filters-row { display: flex; gap: 0.75rem; margin-bottom: 2rem; flex-wrap: wrap; }
-.filter-btn {
-  padding: 0.5rem 1.25rem;
-  border-radius: var(--radius-full);
-  background: var(--clr-surface);
-  border: 1px solid var(--clr-border);
-  color: var(--clr-text-muted);
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-.filter-btn.active, .filter-btn:hover {
-  background: var(--clr-primary);
-  color: #ffffff;
-  border-color: var(--clr-primary);
-}
+
 
 .jobs-grid { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; }
 .job-card { padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; background: var(--clr-surface); border: 1px solid var(--clr-border); }
@@ -598,169 +527,12 @@ onMounted(() => {
   100% { transform: translateX(-100%); }
 }
 
-.ats-overall {
-  padding: 1rem;
-  border-radius: 10px;
-  border: 1px solid var(--clr-border);
-  margin-bottom: 1rem;
-  background: var(--clr-surface);
-}
 
-.ats-score-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.75rem;
-}
-
-.ats-score-number {
-  font-size: 2.5rem;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.ats-score-denom {
-  font-size: 1rem;
-  color: var(--clr-text-muted);
-  margin-left: 4px;
-}
-
-.ats-main-bar {
-  height: 8px;
-  border-radius: 4px;
-  background: var(--clr-surface-3);
-  overflow: hidden;
-  margin-bottom: 1rem;
-}
-
-.ats-main-bar-fill {
-  height: 100%;
-  border-radius: 4px;
-  transition: width 0.6s ease;
-}
-
-.breakdown-section {
-  margin-bottom: 1rem;
-}
-
-.breakdown-title {
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--clr-text-muted);
-  margin-bottom: 0.5rem;
-}
-
-.breakdown-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.4rem;
-}
-
-.breakdown-label {
-  font-size: 0.75rem;
-  color: var(--clr-text-muted);
-  width: 120px;
-  flex-shrink: 0;
-}
-
-.breakdown-bar-track {
-  flex: 1;
-  height: 5px;
-  background: var(--clr-surface-3);
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.breakdown-bar-fill {
-  height: 100%;
-  border-radius: 3px;
-  transition: width 0.5s ease;
-}
-
-.breakdown-score {
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: var(--clr-text);
-  width: 36px;
-  text-align: right;
-  flex-shrink: 0;
-}
-
-.skills-section {
-  margin-bottom: 1rem;
-}
-
-.chips-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  margin-top: 0.35rem;
-}
-
-.chip {
-  padding: 0.2rem 0.6rem;
-  border-radius: 999px;
-  font-size: 0.72rem;
-  font-weight: 600;
-}
-
-.chip-green {
-  background: rgba(16, 185, 129, 0.12);
-  color: #10b981;
-  border: 1px solid rgba(16, 185, 129, 0.3);
-}
-
-.chip-red {
-  background: rgba(239, 68, 68, 0.12);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.3);
-}
-
-.chip-more {
-  background: var(--clr-surface-2);
-  color: var(--clr-text-muted);
-  border: 1px solid var(--clr-border);
-}
-
-.submit-section {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin-top: 1rem;
-}
-
-.flex { display: flex; }
-.justify-between { justify-content: space-between; }
-.items-center { align-items: center; }
-.gap-1 { gap: 0.25rem; }
-.flex-wrap { flex-wrap: wrap; }
-.mb-1 { margin-bottom: 0.25rem; }
-.mb-2 { margin-bottom: 0.5rem; }
-.mb-4 { margin-bottom: 1rem; }
-.mt-3 { margin-top: 0.75rem; }
-.mt-4 { margin-top: 1rem; }
-.text-center { text-align: center; }
-.font-bold { font-weight: 700; }
-.font-semibold { font-weight: 600; }
-.text-primary { color: var(--clr-primary); }
-.p-4 { padding: 1rem; }
-.bg-surface { background: var(--clr-surface); }
 
 .jobs-loading { text-align: center; padding: 4rem; }
-.loader-lg {
-  border: 4px solid var(--clr-surface-2);
-  border-top-color: var(--clr-primary);
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  animation: spin 1s linear infinite;
-  margin: 0 auto 1rem;
-}
 
-.empty-state { text-align: center; padding: 4rem; }
+
+
 
 .toast {
   position: fixed;

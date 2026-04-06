@@ -32,9 +32,7 @@
           <form @submit.prevent="saveProfile">
             <h3 class="subsection-title">Recruiter Information</h3>
             
-            <div v-if="message" :class="['message-banner', messageType]">
-              {{ message }}
-            </div>
+            <AppAlert v-if="message" :message="message" :type="messageType" />
 
             <div class="form-grid">
               <div class="form-group">
@@ -96,6 +94,8 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '../../stores/auth'
+import AppSpinner from '@/components/AppSpinner.vue'
+import AppAlert from '@/components/AppAlert.vue'
 
 const authStore = useAuthStore()
 
@@ -193,27 +193,6 @@ onMounted(() => {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--sp-6);
-}
-
-.message-banner {
-  padding: 1rem;
-  border-radius: var(--radius-md);
-  margin-bottom: 1.5rem;
-  font-weight: 600;
-  text-align: center;
-  font-size: 0.9rem;
-}
-
-.message-banner.success {
-  background: rgba(16, 185, 129, 0.1);
-  color: var(--clr-success);
-  border: 1px solid rgba(16, 185, 129, 0.2);
-}
-
-.message-banner.error {
-  background: rgba(239, 68, 68, 0.1);
-  color: var(--clr-danger);
-  border: 1px solid rgba(239, 68, 68, 0.2);
 }
 
 .my-8 { margin-block: 2rem; }

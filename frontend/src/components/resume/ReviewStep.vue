@@ -156,7 +156,7 @@
       <div class="rs-export-grid">
         <button class="btn btn-primary rs-action-btn" id="rs-btn-save-platform" @click="onSave" :disabled="isSubmitting">
           <svg v-if="!isSubmitting" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-          <span v-else class="loader-sm"></span>
+          <AppSpinner v-else size="sm" />
           <span>{{ isSubmitting ? 'Saving...' : 'Submit to Platform' }}</span>
         </button>
         <button class="btn btn-outline rs-action-btn" id="rs-btn-download-json" @click="onDownloadJSON">
@@ -200,6 +200,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useResumeExport } from '../../composables/useResumeExport.js'
+import AppSpinner from '@/components/AppSpinner.vue'
 
 const props = defineProps({
   structured:  { type: Object, required: true },
@@ -664,18 +665,7 @@ const prettyJSON = computed(() =>
   background: rgba(6,12,27,0.5);
 }
 
-/* Loader */
-.loader-sm {
-  width: 12px;
-  height: 12px;
-  border: 2px solid rgba(255,255,255,0.2);
-  border-top-color: currentColor;
-  border-radius: 50%;
-  animation: rotate 1s linear infinite;
-  display: inline-block;
-}
 
-@keyframes rotate { to { transform: rotate(360deg); } }
 
 /* Collapse transition */
 .rs-collapse-enter-active, .rs-collapse-leave-active {

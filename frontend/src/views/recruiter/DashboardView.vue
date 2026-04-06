@@ -11,18 +11,17 @@
 
       <!-- KPI Cards -->
       <div class="kpi-grid animate-fade-in-up" style="animation-delay:0.1s">
-        <div v-for="kpi in kpis" :key="kpi.label" class="kpi-card card" :id="`kpi-${kpi.label.toLowerCase().replace(/\s/g,'-')}`">
-          <div class="kpi-card__icon" :style="`background: ${kpi.gradient}`">
-            <span v-html="kpi.icon"></span>
-          </div>
-          <div class="kpi-card__body">
-            <span class="kpi-card__value">{{ kpi.value }}</span>
-            <span class="kpi-card__label">{{ kpi.label }}</span>
-          </div>
-          <span class="kpi-card__change" :class="kpi.up ? 'up' : 'down'">
-            {{ kpi.up ? '↑' : '↓' }} {{ kpi.change }}
-          </span>
-        </div>
+        <KpiCard
+          v-for="kpi in kpis"
+          :key="kpi.label"
+          :label="kpi.label"
+          :value="kpi.value"
+          :icon="kpi.icon"
+          :gradient="kpi.gradient"
+          :change="kpi.change"
+          :up="kpi.up"
+          :id="`kpi-${kpi.label.toLowerCase().replace(/\s/g,'-')}`"
+        />
       </div>
 
       <!-- Pipeline -->
@@ -65,6 +64,7 @@
 
 <script setup>
 import { useAuthStore } from '../../stores/auth'
+import KpiCard from '@/components/KpiCard.vue'
 const authStore = useAuthStore()
 
 const kpis = [
@@ -127,14 +127,7 @@ const activity = [
 .dashboard__subtitle { color: var(--clr-text-muted); margin-top: var(--sp-1); }
 
 .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--sp-4); margin-bottom: var(--sp-10); }
-.kpi-card { display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-4) var(--sp-6); }
-.kpi-card__icon { width: 44px; height: 44px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.kpi-card__body { display: flex; flex-direction: column; gap: 2px; flex: 1; }
-.kpi-card__value { font-family: var(--font-heading); font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; }
-.kpi-card__label { font-size: 0.8rem; color: var(--clr-text-muted); font-weight: 500; }
-.kpi-card__change { font-size: 0.8rem; font-weight: 600; padding: 0.2rem 0.5rem; border-radius: var(--radius-full); }
-.kpi-card__change.up   { color: #059669; background: #ecfdf5; }
-.kpi-card__change.down { color: #dc2626; background: #fef2f2; }
+
 
 .subsection-title { font-size: 1.25rem; font-weight: 700; margin-bottom: var(--sp-4); color: var(--clr-text); }
 

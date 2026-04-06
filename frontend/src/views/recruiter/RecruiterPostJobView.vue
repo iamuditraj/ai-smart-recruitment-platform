@@ -11,13 +11,11 @@
 
       <div class="form-card card animate-fade-in-up" style="animation-delay: 0.1s">
         <div v-if="isLoading" class="loading-state">
-          <div class="loader-sm"></div>
+          <AppSpinner size="sm" />
           <p>Loading job details...</p>
         </div>
         <form v-else @submit.prevent="submitJob" class="detailed-form">
-          <div v-if="message" :class="['message-banner', messageType]">
-            {{ message }}
-          </div>
+          <AppAlert v-if="message" :message="message" :type="messageType" />
           
           <!-- Basic Info -->
           <fieldset class="form-section">
@@ -150,7 +148,7 @@
           <div class="submit-section mt-8">
             <button type="submit" class="btn btn-primary submit-btn" :disabled="isPosting">
               <span v-if="!isPosting">{{ isEditMode ? 'Update Job Posting' : 'Publish Job Posting' }}</span>
-              <span v-else class="loader-sm"></span>
+              <AppSpinner v-else size="sm" />
             </button>
           </div>
 
@@ -164,6 +162,8 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
+import AppSpinner from '@/components/AppSpinner.vue'
+import AppAlert from '@/components/AppAlert.vue'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -333,9 +333,7 @@ async function submitJob() {
 .checkbox-group { display: flex; flex-direction: column; gap: 0.5rem; padding-top: 0.5rem; }
 .checkbox-label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; cursor: pointer; color: var(--clr-text); }
 
-.message-banner { padding: 1rem; border-radius: var(--radius-md); margin-bottom: 2rem; font-weight: 600; text-align: center; }
-.message-banner.success { background: rgba(16, 185, 129, 0.1); color: var(--clr-success); border: 1px solid rgba(16, 185, 129, 0.2); }
-.message-banner.error { background: rgba(239, 68, 68, 0.1); color: var(--clr-danger); border: 1px solid rgba(239, 68, 68, 0.2); }
+
 
 .submit-section { display: flex; justify-content: flex-end; border-top: 1px solid var(--clr-border); padding-top: 2rem; }
 .submit-btn { padding: 0.75rem 2.5rem; font-size: 1.1rem; }
@@ -346,15 +344,5 @@ async function submitJob() {
   .submit-btn { width: 100%; }
 }
 
-.loader-sm {
-  width: 18px;
-  height: 18px;
-  border: 2px solid rgba(255,255,255,0.2);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  display: inline-block;
-}
 
-@keyframes spin { to { transform: rotate(360deg); } }
 </style>

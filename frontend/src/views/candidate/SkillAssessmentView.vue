@@ -84,11 +84,12 @@
       </div>
 
       <!-- Empty State -->
-      <div v-if="!questions.length && !showResult" class="empty-state-assessment card animate-fade-in-up" style="animation-delay:0.2s">
-        <div class="empty-state-assessment__icon animate-float">⚡</div>
-        <p class="empty-state-assessment__title">Ready to Assess?</p>
-        <p class="empty-state-assessment__sub">Select a role above and click "Generate Test" to auto-create a skill assessment.</p>
-      </div>
+      <AppEmptyState
+        v-if="!questions.length && !showResult"
+        icon="⚡"
+        title="Ready to Assess?"
+        description="Select a role above and click 'Generate Test' to auto-create a skill assessment."
+      />
     </div>
   </div>
 </template>
@@ -96,6 +97,7 @@
 <script setup>
 import { ref, computed, onUnmounted } from 'vue'
 import axios from 'axios'
+import AppEmptyState from '@/components/AppEmptyState.vue'
 
 const selectedRole = ref('ml')
 const questions = ref([])
@@ -316,16 +318,5 @@ onUnmounted(() => { if (timerInterval) clearInterval(timerInterval) })
 .result-label { color: var(--clr-text-light); font-size: 1rem; }
 
 /* Empty State */
-.empty-state-assessment {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: var(--sp-4);
-  padding: var(--sp-16);
-  margin-top: var(--sp-4);
-}
-.empty-state-assessment__icon { font-size: 3.5rem; }
-.empty-state-assessment__title { font-size: 1.3rem; font-weight: 700; }
-.empty-state-assessment__sub { color: var(--clr-text-muted); max-width: 400px; line-height: 1.7; }
+
 </style>

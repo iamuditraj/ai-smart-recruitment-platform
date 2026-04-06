@@ -40,9 +40,7 @@
           <form @submit.prevent="saveProfile">
             <h3 class="subsection-title">Basic Information</h3>
 
-            <div v-if="message" :class="['message-banner', messageType]">
-              {{ message }}
-            </div>
+            <AppAlert v-if="message" :message="message" :type="messageType" />
 
             <div class="form-grid">
               <div class="form-group">
@@ -171,7 +169,7 @@
             <div class="profile-actions mt-8">
               <button type="submit" class="btn btn-primary" :disabled="isSaving">
                 <span v-if="!isSaving">Save Changes</span>
-                <span v-else class="loader-sm"></span>
+                <AppSpinner v-else size="sm" />
               </button>
             </div>
           </form>
@@ -184,6 +182,9 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '../../stores/auth'
+import { viewResume } from '@/utils/resumeUtils'
+import AppSpinner from '@/components/AppSpinner.vue'
+import AppAlert from '@/components/AppAlert.vue'
 
 const authStore = useAuthStore()
 
@@ -221,25 +222,7 @@ function handlePhotoUpload(event) {
   reader.readAsDataURL(file)
 }
 
-function viewResume(dataUri) {
-  if (!dataUri) return
 
-  try {
-    const base64 = dataUri.split(',')[1]
-    const binary = atob(base64)
-    const array = []
-    for (let i = 0; i < binary.length; i++) {
-      array.push(binary.charCodeAt(i))
-    }
-    const blob = new Blob([new Uint8Array(array)], { type: 'application/pdf' })
-    const url = URL.createObjectURL(blob)
-    window.open(url, '_blank')
-  } catch (error) {
-    console.error('Error viewing resume:', error)
-    // Fallback: try opening the data URI directly if blob fails
-    window.open(dataUri, '_blank')
-  }
-}
 
 async function saveProfile() {
   isSaving.value = true
@@ -369,26 +352,7 @@ onMounted(() => {
   gap: var(--sp-6);
 }
 
-.message-banner {
-  padding: 1rem;
-  border-radius: var(--radius-md);
-  margin-bottom: 1.5rem;
-  font-weight: 600;
-  text-align: center;
-  font-size: 0.9rem;
-}
 
-.message-banner.success {
-  background: rgba(16, 185, 129, 0.1);
-  color: var(--clr-success);
-  border: 1px solid rgba(16, 185, 129, 0.2);
-}
-
-.message-banner.error {
-  background: rgba(239, 68, 68, 0.1);
-  color: var(--clr-danger);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-}
 
 .my-8 { margin-block: 2rem; }
 .mt-8 { margin-top: 2rem; }
@@ -409,16 +373,7 @@ onMounted(() => {
   }
 }
 
-.loader-sm {
-  width: 18px;
-  height: 18px;
-  border: 2px solid rgba(255,255,255,0.2);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
 
-@keyframes spin { to { transform: rotate(360deg); } }
 
 .resume-section {
   background: rgba(99, 102, 241, 0.03);
