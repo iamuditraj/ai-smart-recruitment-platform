@@ -1,38 +1,42 @@
 <template>
-  <div class="profile-view">
-    <div class="content-area">
-      <div class="profile-header animate-fade-in-up">
-        <div class="header-content">
-          <div>
-            <h1 class="profile-title">Recruiter Profile</h1>
-            <p class="profile-subtitle">Manage your company and recruiter details</p>
-          </div>
-          <router-link to="/manage-jobs" class="btn btn-primary">
-            Post Hiring Request
-          </router-link>
+  <ProfileLayout
+    :message="message"
+    :messageType="messageType"
+    :isSaving="isSaving"
+    @save="handleSave"
+  >
+    <!-- Header Override (because it has the Post Hiring Request button) -->
+    <template #header>
+      <div class="header-content">
+        <div>
+          <h1 class="profile-title">Recruiter Profile</h1>
+          <p class="profile-subtitle">Manage your company and recruiter details</p>
+        </div>
+        <router-link to="/manage-jobs" class="btn btn-primary">
+          Post Hiring Request
+        </router-link>
+      </div>
+    </template>
+
+    <!-- Left: Static Info -->
+    <template #left-pane>
+      <h2 class="text-center mt-4">{{ authStore.user?.name }}</h2>
+      <p class="text-center text-muted text-sm">{{ authStore.user?.email }}</p>
+      <div class="badge badge-primary mt-2 mx-auto capitalize">{{ authStore.role }}</div>
+      
+      <div class="profile-info-list" v-if="authStore.user?.companyName">
+        <div class="info-item">
+          <span class="label">Company</span>
+          <span class="value">{{ authStore.user?.companyName }}</span>
         </div>
       </div>
-      <div class="profile-content grid">
-        <!-- Left: Static Info -->
-        <div class="profile-card card animate-fade-in-up" style="animation-delay: 0.1s">
-            <h2 class="text-center mt-4">{{ authStore.user?.name }}</h2>
-            <p class="text-center text-muted text-sm">{{ authStore.user?.email }}</p>
-            <div class="badge badge-primary mt-2 mx-auto capitalize">{{ authStore.role }}</div>
-            
-            <div class="profile-info-list" v-if="authStore.user?.companyName">
-              <div class="info-item">
-                <span class="label">Company</span>
-                <span class="value">{{ authStore.user?.companyName }}</span>
-              </div>
-            </div>
-        </div>
+    </template>
 
-        <!-- Right: Edit Form -->
-        <div class="profile-form card animate-fade-in-up" style="animation-delay: 0.2s">
-          <form @submit.prevent="saveProfile">
-            <h3 class="subsection-title">Recruiter Information</h3>
-            
-            <AppAlert v-if="message" :message="message" :type="messageType" />
+    <template #form-title>
+      <h3 class="subsection-title">Recruiter Information</h3>
+    </template>
+
+    <template #form-fields>
 
             <div class="form-grid">
               <div class="form-group">
@@ -78,17 +82,8 @@
               <textarea v-model="formData.companyDescription" class="form-input" rows="4" placeholder="Tell us about your company..."></textarea>
             </div>
 
-            <div class="profile-actions mt-8">
-              <button type="submit" class="btn btn-primary" :disabled="isSaving">
-                <span v-if="!isSaving">Save Changes</span>
-                <AppSpinner v-else size="sm" />
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-  </div>
+    </template>
+  </ProfileLayout>
 </template>
 
 <script setup>
@@ -96,12 +91,11 @@ import { ref, onMounted } from 'vue'
 import { useAuthStore } from '../../stores/auth'
 import AppSpinner from '@/components/AppSpinner.vue'
 import AppAlert from '@/components/AppAlert.vue'
+import ProfileLayout from '@/components/ProfileLayout.vue'
+import { useProfileForm } from '@/composables/useProfileForm'
 
 const authStore = useAuthStore()
-
-const isSaving = ref(false)
-const message = ref('')
-const messageType = ref('success')
+const { isSaving, message, messageType, saveProfile } = useProfileForm()
 
 const formData = ref({
   name: authStore.user?.name || '',
@@ -113,24 +107,7 @@ const formData = ref({
   location: authStore.user?.location || ''
 })
 
-async function saveProfile() {
-  isSaving.value = true
-  message.value = ''
-
-  const result = await authStore.updateProfile(formData.value)
-
-  isSaving.value = false
-  if (result.success) {
-    message.value = 'Profile updated successfully!'
-    messageType.value = 'success'
-  } else {
-    message.value = result.message || 'Failed to update profile'
-    messageType.value = 'error'
-  }
-
-  // Clear message after 3s
-  setTimeout(() => message.value = '', 3000)
-}
+const handleSave = () => saveProfile(formData.value)
 
 onMounted(() => {
   authStore.refreshUser().then(() => {
@@ -147,70 +124,3 @@ onMounted(() => {
 })
 </script>
 
-<style scoped>
-.profile-view { min-height: 100vh; }
-.profile-header { margin-bottom: var(--sp-8); }
-.header-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.profile-title { font-size: 2rem; font-weight: 800; }
-.profile-subtitle { color: var(--clr-text-muted); margin-top: var(--sp-1); }
-
-.profile-content {
-  grid-template-columns: 320px 1fr;
-  align-items: start;
-  gap: var(--sp-8);
-}
-
-.profile-info-list {
-  margin-top: 2rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-}
-
-.info-item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.info-item .label {
-  font-size: 0.75rem;
-  color: var(--clr-text-muted);
-  text-transform: uppercase;
-  font-weight: 600;
-}
-
-.info-item .value {
-  font-weight: 600;
-  color: var(--clr-text);
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--sp-6);
-}
-
-.mx-auto { margin-inline: auto; }
-
-@media (max-width: 1000px) {
-  .profile-content {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 600px) {
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
-  .header-content {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1rem;
-  }
-}
-</style>

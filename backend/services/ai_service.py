@@ -59,8 +59,20 @@ def _run_inference(prompt: str) -> dict:
     print("⚠️ Groq unavailable — using fallback defaults")
     return fallback
 
-def parse_resume_against_jd(resume_text: str, jd_text: str) -> dict:
-    prompt = f"""Analyze the following resume in the context of the provided job description. 
+def parse_resume(resume_text: str, jd_text: str = None) -> dict:
+    """Parse a resume into structured data.
+
+    When *jd_text* is provided the prompt also asks the LLM for
+    ``skills_found`` (skills matching the JD) which the ATS scorer needs.
+    Temperature is always 0.1 (via ``_run_inference``) for consistent scoring.
+    """
+    jd_context = ""
+    skills_found_field = ""
+    if jd_text:
+        jd_context = f"\nJob Description:\n{jd_text}\n"
+        skills_found_field = '- "skills_found": (list of strings) specifically those that match or are relevant to the JD\n'
+
+    prompt = f"""Analyze the following resume{' in the context of the provided job description' if jd_text else ''}.
 Extract the candidate's professional profile into a detailed JSON format.
 
 Return strict JSON with exactly these keys:
@@ -75,16 +87,19 @@ Return strict JSON with exactly these keys:
 - "experience": (list of objects) Each object must have: "title", "company", "duration", "description"
 - "education": (list of objects) Each object must have: "degree", "institution", "year"
 - "certifications": (list of strings)
-- "skills_found": (list of strings) specifically those that match or are relevant to the JD
-
-Job Description:
-{jd_text}
-
+- "languages": (list of strings)
+{skills_found_field}
+{jd_context}
 Resume content:
 {resume_text}
 
 Return ONLY the JSON object. No other text."""
     return _run_inference(prompt)
+
+
+def parse_resume_against_jd(resume_text: str, jd_text: str) -> dict:
+    """Convenience wrapper — always includes JD context for ATS scoring."""
+    return parse_resume(resume_text, jd_text=jd_text)
 
 def parse_job_description(jd_text: str) -> dict:
     prompt = f"""Analyze the following job description.

@@ -14,15 +14,15 @@
 
       <!-- KPI Cards -->
       <div class="kpi-grid animate-fade-in-up" style="animation-delay:0.1s">
-        <div v-for="kpi in kpis" :key="kpi.label" class="kpi-card card">
-          <div class="kpi-card__icon" :style="`background: ${kpi.gradient}`">
-            <span v-html="kpi.icon"></span>
-          </div>
-          <div class="kpi-card__body">
-            <span class="kpi-card__value">{{ kpi.value }}</span>
-            <span class="kpi-card__label">{{ kpi.label }}</span>
-          </div>
-        </div>
+        <KpiCard
+          v-for="kpi in kpis"
+          :key="kpi.label"
+          :label="kpi.label"
+          :value="kpi.value"
+          :icon="kpi.icon"
+          :gradient="kpi.gradient"
+          :id="`kpi-${kpi.label.toLowerCase().replace(/\\s/g,'-')}`"
+        />
       </div>
 
       <!-- Applications Section -->
@@ -77,6 +77,7 @@
 
 <script setup>
 import { useAuthStore } from '../../stores/auth'
+import KpiCard from '@/components/KpiCard.vue'
 const authStore = useAuthStore()
 
 const kpis = [
@@ -100,11 +101,6 @@ const applications = [
 .dashboard__subtitle { color: var(--clr-text-muted); margin-top: var(--sp-1); }
 
 .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--sp-4); margin-bottom: var(--sp-10); }
-.kpi-card { display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-4) var(--sp-6); background: var(--clr-surface); border: 1px solid var(--clr-border); }
-.kpi-card__icon { width: 44px; height: 44px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.kpi-card__body { display: flex; flex-direction: column; }
-.kpi-card__value { font-size: 1.5rem; font-weight: 800; color: var(--clr-text); }
-.kpi-card__label { font-size: 0.8rem; color: var(--clr-text-muted); }
 
 .subsection-title { font-size: 1.25rem; font-weight: 700; margin-bottom: var(--sp-4); color: var(--clr-text); }
 
