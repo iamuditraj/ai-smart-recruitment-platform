@@ -1,44 +1,96 @@
-# frontend
+# 🎨 HireAI — Frontend
 
-This template should help get you started developing with Vue 3 in Vite.
+Welcome to the frontend of **HireAI**, an AI-powered smart recruitment platform. This application is built as a modern Single Page Application (SPA) using **Vue.js 3** and **Vite**.
 
-## Recommended IDE Setup
+---
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+## 🚀 Overview
 
-## Recommended Browser Setup
+The HireAI frontend provides a seamless, responsive experience for both candidates and recruiters. It handles complex workflows like interactive mock interviews with camera/microphone access, AI-generated technical assessments, and a comprehensive recruiter dashboard for ATS screening.
 
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+### Key Features
+- **Candidate Hub**: Resume management, job browsing, and application tracking.
+- **Recruiter Dashboard**: Job posting, applicant management, and bulk ATS analysis.
+- **AI Mock Interview**: Interactive camera-based session with real-time performance feedback.
+- **Skill Assessment**: Role-specific technical MCQs generated on-the-fly.
 
-## Customize configuration
+---
 
-See [Vite Configuration Reference](https://vite.dev/config/).
+## 🛠️ Tech Stack
 
-## Project Setup
+- **Core**: Vue.js 3 (Composition API)
+- **State Management**: Pinia
+- **Routing**: Vue Router
+- **HTTP Client**: Axios
+- **Styling**: Vanilla CSS (Modern CSS variables & Grid/Flexbox)
+- **Build Tool**: Vite
+- **AI Integration**: Backend-driven Groq AI API
 
-```sh
+---
+
+## 📁 Project Structure
+
+```
+frontend/
+├── src/
+│   ├── views/          # Page components (Candidate, Recruiter, Shared)
+│   ├── components/     # Reusable UI components (Modals, Cards, Spinners)
+│   ├── stores/         # Pinia global state (Auth, Jobs)
+│   ├── assets/         # Global styles (index.css) and static images
+│   ├── utils/          # API services, formatters, and validators
+│   ├── router/         # Application routing configuration
+│   └── App.vue         # Root component
+├── public/             # Static assets (Favicon, robots.txt)
+├── index.html          # HTML entry point
+├── vite.config.js      # Vite configuration
+└── package.json        # Dependencies and scripts
+```
+
+---
+
+## ⚙️ Project Setup
+
+### Prerequisites
+- **Node.js**: v18 or higher
+- **npm**: v9 or higher
+
+### Installation
+
+```bash
 npm install
 ```
 
-### Compile and Hot-Reload for Development
+### Development
 
-```sh
+Start the development server with hot-reload:
+
+```bash
 npm run dev
 ```
 
-### Compile and Minify for Production
+The application will be available at `http://localhost:5173`.
 
-```sh
+### Production
+
+Compile and minify for production:
+
+```bash
 npm run build
 ```
 
-### Lint with [ESLint](https://eslint.org/)
+### Code Quality
 
-```sh
+Run ESLint to check for code quality:
+
+```bash
 npm run lint
 ```
+
+---
+
+## 🎨 Design System
+
+The project uses a custom design system defined in `src/assets/index.css`.
+- **Colors**: Deep indigo/violet theme with success/warning/danger status colors.
+- **Components**: Pre-styled cards, buttons, and inputs for consistency.
+- **Layout**: Mobile-responsive grid system with a sidebar-based dashboard layout.
