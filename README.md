@@ -67,36 +67,35 @@
 ```
 ai-smart-recruitment-platform/
 ├── backend/                    # Flask API server
-│   ├── app.py                  # Entry point & Initialisation
-│   ├── routes/
-│   │   └── api_routes.py       # Core API endpoints & logic
+│   ├── app.py                  # Entry point & Initialization
+│   ├── routes/                 # Modularized API routes
+│   │   ├── auth_routes.py      # Login & Signup logic
+│   │   ├── ai_routes.py        # Groq AI & ATS orchestration
+│   │   ├── job_routes.py       # Job lifecycle management
+│   │   ├── profile_routes.py   # Candidate & Recruiter profiles
+│   │   ├── candidate_routes.py # Candidate-specific actions
+│   │   └── recruiter_routes.py # Recruiter Dashboard logic
 │   ├── services/
 │   │   ├── ai_service.py       # Groq AI integration
 │   │   ├── firebase_service.py # Firestore database wrapper
 │   │   ├── parser_service.py   # PDF/DOCX text extraction
-│   │   └── ats/                # ATS Logic
-│   │       ├── scorer.py       # Weighted scoring & fuzzy matching
-│   │       └── jd_parser.py    # JD structure extraction
-│   ├── firebase/               # Firebase config & service account
+│   │   └── ats/                # Weighted ATS Scoring Engine
+│   │       └── scorer.py       # Core ranking & fuzzy logic
 │   ├── requirements.txt        # Python dependencies
 │   └── .env.example            # Environment variables template
 │
 ├── frontend/                   # Vue.js 3 SPA
 │   ├── src/
-│   │   ├── views/              # Organized by user role
-│   │   │   ├── candidate/      # BrowseJobs, MockInterview, SkillAssessment, etc.
-│   │   │   ├── recruiter/      # Dashboard, PostJob, ResumeScreening, etc.
-│   │   │   └── shared/         # Home, Login, Signup
+│   │   ├── views/              # View components (Candidate/Recruiter/Shared)
 │   │   ├── components/         # Reusable UI components
 │   │   ├── stores/             # Pinia state management
-│   │   ├── assets/             # Main CSS & Images
-│   │   └── utils/              # API helpers (Axios)
+│   │   ├── assets/             # Main CSS & Styles
+│   │   ├── utils/              # API helpers & Validators
+│   │   └── router/             # Vue Router configuration
 │   └── package.json            # Node dependencies
 │
-├── docs/                       # Project documentation
-├── modules/                    # Feature specifications
-├── future-scope.md             # Roadmap
-└── risks-and-limitations.md     # Risk analysis
+├── modules/                    # Feature specifications & Documentation
+└── docs/                       # Project documentation
 ```
 
 ---
@@ -184,16 +183,17 @@ FLASK_ENV=development
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `POST` | `/api/signup` | User registration (Candidate/Recruiter) |
-| `POST` | `/api/login` | Session authentication |
+| `POST` | `/api/auth/signup` | User registration (Candidate/Recruiter) |
+| `POST` | `/api/auth/login` | Session authentication |
 | `GET/POST` | `/api/profile` | Handle user profile data |
-| `POST` | `/api/analyze` | Individual or bulk ATS resume analysis |
-| `POST` | `/api/jobs/apply` | Apply for a job and calculate ATS score |
+| `POST` | `/api/analyze` | Bulk ATS resume analysis (Recruiter) |
+| `POST` | `/api/score-resume` | Individual ATS score calculation |
 | `POST` | `/api/generate-content` | AI-generated resume content via Groq |
 | `POST` | `/api/generate-assessment` | Generate technical MCQs for a specific role |
 | `GET/POST` | `/api/jobs` | Fetch job board or post new job listings |
 | `GET/PUT/DEL` | `/api/jobs/<id>` | Manage specific job details |
-| `GET` | `/api/profile/resumes`| Retrieve all stored resumes for a candidate |
+| `GET` | `/api/profile/resumes` | Retrieve all stored resumes for a candidate |
+| `POST` | `/api/jobs/apply` | Submit job application with ATS results |
 
 ---
 
