@@ -15,6 +15,11 @@ export const useAuthStore = defineStore('auth', () => {
   const isRecruiter = computed(() => role.value === 'recruiter')
   const isCandidate = computed(() => role.value === 'candidate')
 
+  const handleApiError = (context, error) => {
+    console.error(`${context} error:`, error)
+    return { success: false, message: error.message || 'Server connection failed' }
+  }
+
   async function login(email, password) {
     try {
       const data = await loginUser(email, password)
@@ -23,8 +28,7 @@ export const useAuthStore = defineStore('auth', () => {
       localStorage.setItem('user_role', data.user.role)
       return { success: true }
     } catch (error) {
-      console.error('Login error:', error)
-      return { success: false, message: error.message || 'Server connection failed' }
+      return handleApiError('Login', error)
     }
   }
 
@@ -36,8 +40,7 @@ export const useAuthStore = defineStore('auth', () => {
       localStorage.setItem('user_role', data.user.role)
       return { success: true }
     } catch (error) {
-      console.error('Signup error:', error)
-      return { success: false, message: error.message || 'Server connection failed' }
+      return handleApiError('Signup', error)
     }
   }
 
@@ -48,8 +51,7 @@ export const useAuthStore = defineStore('auth', () => {
       localStorage.setItem('auth_user', JSON.stringify(data.user))
       return { success: true }
     } catch (error) {
-      console.error('Profile update error:', error)
-      return { success: false, message: error.message || 'Server connection failed' }
+      return handleApiError('Profile update', error)
     }
   }
 

@@ -1,8 +1,12 @@
 <template>
   <AuthLayout title="Create Account" subtitle="Join HireAI to start your journey">
 
-        <form @submit.prevent="handleSignup" class="login-form">
-          <AppAlert :message="errorMessage" type="error" />
+        <AuthForm 
+          @submit="handleSignup" 
+          :loading="isLoading" 
+          :error="errorMessage" 
+          submitText="Create Free Account"
+        >
 
           <div class="form-group">
             <label class="form-label">I am a...</label>
@@ -63,13 +67,7 @@
             />
           </div>
 
-          <div class="login-footer">
-            <button type="submit" class="btn btn-primary w-full" :disabled="isLoading">
-              <span v-if="!isLoading">Create Free Account</span>
-              <AppSpinner v-else size="sm" />
-            </button>
-          </div>
-        </form>
+        </AuthForm>
 
         <template #footer>
           <p class="text-sm text-muted">Already have an account? <RouterLink to="/login" class="gradient-text font-bold">Sign in</RouterLink></p>
@@ -81,9 +79,8 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
-import AppSpinner from '@/components/AppSpinner.vue'
-import AppAlert from '@/components/AppAlert.vue'
 import AuthLayout from '@/components/AuthLayout.vue'
+import AuthForm from '@/components/AuthForm.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -116,47 +113,4 @@ async function handleSignup() {
 </script>
 
 <style scoped>
-.login-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-5);
-}
-
-.role-tabs {
-  display: flex;
-  background: var(--clr-surface-2);
-  padding: 4px;
-  border-radius: var(--radius-md);
-  margin-bottom: var(--sp-2);
-}
-
-.role-tab {
-  flex: 1;
-  padding: 0.6rem;
-  border: none;
-  background: transparent;
-  color: var(--clr-text-muted);
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-  border-radius: var(--radius-sm);
-  transition: all var(--transition-base);
-}
-
-.role-tab.active {
-  background: var(--clr-surface);
-  color: var(--clr-primary);
-  box-shadow: var(--shadow-sm);
-}
-
-.login-footer {
-  margin-top: var(--sp-2);
-}
-
-:deep(.gradient-text) {
-  background: var(--gradient-brand);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
 </style>
