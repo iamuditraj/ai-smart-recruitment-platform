@@ -1,6 +1,37 @@
 import io
 import datetime
 from firebase_admin import firestore
+from services.email_service import EmailService
+
+# ── Multi-round pipeline defaults ─────────────────────────────────────────
+DEFAULT_ROUNDS = ["Applied", "Screening", "Technical", "HR", "Hired"]
+MAX_ROUNDS = 10
+
+
+def validate_rounds(rounds):
+    """Validate a hiring-pipeline rounds array.
+
+    Returns ``(cleaned_list, error_string | None)``.
+    On success *error_string* is ``None``; on failure *cleaned_list* is ``None``.
+    """
+    if not rounds or not isinstance(rounds, list):
+        return None, "rounds must be a non-empty list"
+    if len(rounds) > MAX_ROUNDS:
+        return None, f"Maximum {MAX_ROUNDS} rounds allowed"
+    cleaned = []
+    seen = set()
+    for r in rounds:
+        if not isinstance(r, str) or not r.strip():
+            return None, "Each round must be a non-empty string"
+        name = r.strip()
+        if name.lower() in seen:
+            return None, f"Duplicate round name: '{name}'"
+        seen.add(name.lower())
+        cleaned.append(name)
+    if cleaned[0] != "Applied":
+        return None, "The first round must be 'Applied'"
+    return cleaned, None
+
 
 def get_user_collection(db, email: str):
     """
@@ -138,3 +169,115 @@ def enrich_app_with_candidate(db, app_data):
             app_data['candidate_name'] = c_email.split('@')[0]
 
     return app_data
+
+
+def advance_round(db, job_id, expected_round_index):
+    """Advance a job's hiring pipeline to the next round using a batch write.
+
+    Validates:
+    - Job exists and has rounds configured.
+    - ``expected_round_index`` matches the job's ``current_round_index`` (idempotency).
+    - Not already at the final round.
+    - No active applications have ``round_status == 'Pending'``.
+
+    On success, atomically:
+    - Rejected candidates (``round_status == 'Reject'``): ``terminal_round_index`` set,
+      ``status`` set to ``'Rejected'``.
+    - Cleared candidates (``round_status == 'Cleared'``): ``round_status`` reset to
+      ``'Pending'``, ``status`` set to the next round name (or ``'Hired'`` if final).
+    - Job's ``current_round_index`` incremented by 1.
+
+    Returns ``(summary_dict, error_string)``.
+    """
+    job_ref = db.collection('jobs').document(job_id)
+    job_doc = job_ref.get()
+    if not job_doc.exists:
+        return None, "Job not found"
+
+    job_data = job_doc.to_dict()
+    rounds = job_data.get('rounds', [])
+    current_idx = job_data.get('current_round_index', 0)
+
+    # Idempotency guard
+    if current_idx != expected_round_index:
+        return None, (
+            f"Round already advanced. Expected index {expected_round_index}, "
+            f"but job is at index {current_idx}."
+        )
+
+    # Cannot advance past the last round (but allow advancing FROM the last round to finalize the pipeline)
+    if current_idx >= len(rounds):
+        return None, "Pipeline is already complete"
+
+    # Fetch all active applications
+    apps_ref = db.collection('jobs').document(job_id).collection('applications')
+    active_apps = []
+    for doc in apps_ref.stream():
+        app = doc.to_dict()
+        app['_ref'] = doc.reference
+        if app.get('terminal_round_index') is None:
+            active_apps.append(app)
+
+    # Validate no pending candidates
+    pending = [a for a in active_apps if (a.get('round_status') or 'Pending') == 'Pending']
+    if pending:
+        return None, f"{len(pending)} candidate(s) are still pending evaluation"
+
+    # Separate cleared vs rejected
+    cleared = [a for a in active_apps if a.get('round_status') == 'Cleared']
+    rejected = [a for a in active_apps if a.get('round_status') == 'Reject']
+
+    next_idx = current_idx + 1
+    is_complete_now = next_idx >= len(rounds)
+    next_round_name = "Hired" if is_complete_now else rounds[next_idx]
+
+    # Build batch write
+    batch = db.batch()
+    email_client = EmailService()
+    
+    job_title = job_data.get('title', 'the open position')
+    company = job_data.get('company', 'our company')
+
+    for app in rejected:
+        c_name = app.get('candidate_name') or app.get('candidate_email', 'Candidate')
+        c_email = app.get('candidate_email')
+        
+        email_log = email_client.send_rejection_email(
+            c_email, c_name, job_title, company, rounds[current_idx]
+        )
+        
+        batch.update(app['_ref'], {
+            'terminal_round_index': current_idx,
+            'round_status': 'Reject',
+            'status': 'Rejected',
+            'communications_log': firestore.ArrayUnion([email_log])
+        })
+
+    for app in cleared:
+        c_name = app.get('candidate_name') or app.get('candidate_email', 'Candidate')
+        c_email = app.get('candidate_email')
+        
+        if is_complete_now:
+            email_log = email_client.send_hired_email(c_email, c_name, job_title, company)
+        else:
+            email_log = email_client.send_advancement_email(c_email, c_name, job_title, company, next_round_name)
+            
+        batch.update(app['_ref'], {
+            'round_status': 'Cleared' if is_complete_now else 'Pending',
+            'status': next_round_name,
+            'communications_log': firestore.ArrayUnion([email_log])
+        })
+
+    batch.update(job_ref, {
+        'current_round_index': next_idx,
+    })
+
+    batch.commit()
+
+    return {
+        'cleared_count': len(cleared),
+        'rejected_count': len(rejected),
+        'new_round_index': next_idx,
+        'new_round_name': next_round_name,
+        'is_pipeline_complete': is_complete_now,
+    }, None

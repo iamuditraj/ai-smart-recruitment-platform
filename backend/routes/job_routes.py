@@ -6,6 +6,7 @@ from routes.decorators import handle_route_errors, require_db
 from services.db_helpers import (
     serialize_timestamps, build_ats_pipeline,
     get_job_with_parsed_jd, enrich_app_with_candidate,
+    DEFAULT_ROUNDS, validate_rounds, advance_round,
 )
 
 job_bp = Blueprint('job', __name__)
@@ -40,11 +41,20 @@ def handle_jobs():
         
         if not all([title, company, recruiter_email]):
             return jsonify({"status": "error", "message": "Missing required job fields: title, company, or recruiter_email"}), 400
-        
+
+        # ── Pipeline rounds ───────────────────────────────────────────
+        raw_rounds = data.get('rounds') or DEFAULT_ROUNDS
+        rounds, rounds_err = validate_rounds(raw_rounds)
+        if rounds_err:
+            return jsonify({"status": "error", "message": rounds_err}), 400
+
         job_ref = g.db.collection('jobs').document()
         job_data = {"id": job_ref.id, "recruiter_email": recruiter_email, "posted_at": firestore.SERVER_TIMESTAMP}
         for field in _JOB_EDITABLE_FIELDS:
             job_data[field] = data.get(field, _JOB_DEFAULTS.get(field))
+
+        job_data['rounds'] = rounds
+        job_data['current_round_index'] = 0
 
         job_ref.set(job_data)
         response_data = job_data.copy()
@@ -92,6 +102,17 @@ def handle_specific_job(job_id):
         data = request.json
         update_data = {field: data.get(field) for field in _JOB_EDITABLE_FIELDS}
         update_data = {k: v for k, v in update_data.items() if v is not None}
+
+        # ── Pipeline rounds (editable only before advancement) ────────
+        if 'rounds' in data:
+            job_data = job_doc.to_dict()
+            if job_data.get('current_round_index', 0) > 0:
+                return jsonify({"status": "error", "message": "Cannot edit rounds after the pipeline has advanced"}), 400
+            rounds, rounds_err = validate_rounds(data['rounds'])
+            if rounds_err:
+                return jsonify({"status": "error", "message": rounds_err}), 400
+            update_data['rounds'] = rounds
+
         update_data['updated_at'] = firestore.SERVER_TIMESTAMP
 
         job_ref.update(update_data)
@@ -176,7 +197,11 @@ def apply_for_job():
         "matched_skills": ats_result.get("matched_skills", []),
         "missing_skills": ats_result.get("key_gaps", []),
         "resume_filename": resume_file.filename,
-        "parsedResume": llm_parsed_resume 
+        "parsedResume": llm_parsed_resume,
+        # ── Pipeline fields ───────────────────────────────────────
+        "round_status": "Pending",
+        "terminal_round_index": None,
+        "communications_log": [],
     }
     app_ref.set(app_data)
 
@@ -219,6 +244,8 @@ def get_job_applications(job_id):
         "status": "success",
         "job_title": job_data.get('title', 'Unknown Job'),
         "job_id": job_id,
+        "rounds": job_data.get('rounds', []),
+        "current_round_index": job_data.get('current_round_index', 0),
         "applications": all_apps
     })
 
@@ -227,14 +254,28 @@ def get_job_applications(job_id):
 @require_db
 def update_application_status(job_id, app_id):
     data = request.json
-    new_status = data.get('status')
-    if new_status not in ('Shortlisted', 'Rejected', 'Applied'):
-        return jsonify({"status": "error", "message": "Invalid status. Use Shortlisted, Rejected, or Applied."}), 400
 
     app_ref = g.db.collection('jobs').document(job_id).collection('applications').document(app_id)
     app_doc = app_ref.get()
     if not app_doc.exists:
         return jsonify({"status": "error", "message": "Application not found"}), 404
+
+    # ── Round-based evaluation (Cleared / Reject / Pending) ───────
+    round_status = data.get('round_status')
+    if round_status:
+        if round_status not in ('Cleared', 'Reject', 'Pending'):
+            return jsonify({"status": "error", "message": "Invalid round_status. Use Cleared, Reject, or Pending."}), 400
+        app_ref.update({"round_status": round_status})
+        return jsonify({
+            "status": "success",
+            "message": f"Round status updated to {round_status}",
+            "round_status": round_status
+        })
+
+    # ── Legacy status (Applied / Shortlisted / Rejected) ──────────
+    new_status = data.get('status')
+    if new_status not in ('Shortlisted', 'Rejected', 'Applied'):
+        return jsonify({"status": "error", "message": "Invalid status. Use Shortlisted, Rejected, or Applied."}), 400
 
     app_ref.update({"status": new_status})
 
@@ -279,4 +320,24 @@ def bulk_update_application_status(job_id):
         "status": "success",
         "message": f"{updated_count} applications updated to {new_status}",
         "updated_count": updated_count
+    })
+
+@job_bp.route('/api/jobs/<job_id>/advance-round', methods=['POST'])
+@handle_route_errors
+@require_db
+def advance_job_round(job_id):
+    data = request.json or {}
+    expected_idx = data.get('expected_round_index')
+
+    if expected_idx is None or not isinstance(expected_idx, int):
+        return jsonify({"status": "error", "message": "expected_round_index is required (integer)"}), 400
+
+    summary, err = advance_round(g.db, job_id, expected_idx)
+    if err:
+        return jsonify({"status": "error", "message": err}), 400
+
+    return jsonify({
+        "status": "success",
+        "message": f"Round advanced to '{summary['new_round_name']}'",
+        **summary
     })
