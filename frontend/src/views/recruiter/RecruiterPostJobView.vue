@@ -143,6 +143,63 @@
             </div>
           </fieldset>
 
+          <div class="divider"></div>
+
+          <!-- Hiring Pipeline -->
+          <fieldset class="form-section">
+            <legend class="section-title">Hiring Pipeline</legend>
+            <p class="section-desc">Define the stages candidates will progress through. The first round ("Applied") is fixed. Max 10 rounds.</p>
+
+            <div class="pipeline-rounds" id="pipeline-rounds-editor">
+              <div
+                v-for="(round, idx) in formData.rounds"
+                :key="idx"
+                class="round-chip"
+                :class="{ 'round-chip--locked': idx === 0, 'round-chip--last': idx === formData.rounds.length - 1 }"
+              >
+                <span class="round-chip__index">{{ idx + 1 }}</span>
+                <span class="round-chip__name">{{ round }}</span>
+                <button
+                  v-if="idx !== 0"
+                  type="button"
+                  class="round-chip__remove"
+                  @click="removeRound(idx)"
+                  title="Remove round"
+                  :disabled="pipelineLocked"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+                <!-- Connector arrow -->
+                <svg v-if="idx < formData.rounds.length - 1" class="round-connector" width="20" height="14" viewBox="0 0 20 14">
+                  <path d="M0 7h14M10 2l5 5-5 5" fill="none" stroke="var(--clr-text-muted)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.4"/>
+                </svg>
+              </div>
+            </div>
+
+            <div v-if="!pipelineLocked && formData.rounds.length < 10" class="add-round-row">
+              <input
+                v-model.trim="newRound"
+                type="text"
+                class="form-input add-round-input"
+                placeholder="e.g. Portfolio Review"
+                maxlength="40"
+                @keydown.enter.prevent="addRound"
+                id="input-add-round"
+              />
+              <button type="button" class="btn btn-outline btn-sm" @click="addRound" id="btn-add-round">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Add Round
+              </button>
+            </div>
+            <p v-if="formData.rounds.length >= 10" class="pipeline-limit-msg">Maximum of 10 rounds reached.</p>
+            <p v-if="pipelineLocked" class="pipeline-locked-msg">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              Pipeline is locked because candidate advancement has already begun.
+            </p>
+          </fieldset>
+
           <!-- Submit -->
           <div class="submit-section mt-8">
             <button type="submit" class="btn btn-primary submit-btn" :disabled="isPosting">
@@ -199,8 +256,26 @@ const formData = ref({
   reqResume: true,
   reqCoverLetter: false,
   reqPortfolio: false,
-  recruiter_email: authStore.user?.email || ''
+  recruiter_email: authStore.user?.email || '',
+  rounds: ['Applied', 'Screening', 'Technical', 'HR', 'Hired'],
 })
+
+const newRound = ref('')
+const pipelineLocked = ref(false)
+
+function addRound() {
+  const name = newRound.value.trim()
+  if (!name || formData.value.rounds.length >= 10) return
+  const dup = formData.value.rounds.some(r => r.toLowerCase() === name.toLowerCase())
+  if (dup) return
+  formData.value.rounds.push(name)
+  newRound.value = ''
+}
+
+function removeRound(idx) {
+  if (idx === 0 || pipelineLocked.value) return
+  formData.value.rounds.splice(idx, 1)
+}
 
 function goBack() {
   router.push('/manage-jobs')
@@ -223,6 +298,11 @@ async function fetchJobDetails() {
       formData.value.reqCoverLetter = job.requiredDocumentsList.includes('Cover Letter')
       formData.value.reqPortfolio = job.requiredDocumentsList.includes('Portfolio')
     }
+    // Pipeline rounds
+    if (job.rounds && Array.isArray(job.rounds)) {
+      formData.value.rounds = job.rounds
+    }
+    pipelineLocked.value = (job.current_round_index || 0) > 0
   } catch (err) {
     console.error('Fetch job error:', err)
     message.value = 'Error loading job details.'
@@ -313,10 +393,120 @@ async function submitJob() {
 .submit-section { display: flex; justify-content: flex-end; border-top: 1px solid var(--clr-border); padding-top: 2rem; }
 .submit-btn { padding: 0.75rem 2.5rem; font-size: 1.1rem; }
 
+/* ═══ Hiring Pipeline ════════════════════════════════════════ */
+.section-desc {
+  font-size: 0.85rem;
+  color: var(--clr-text-muted);
+  margin-bottom: 1.25rem;
+  line-height: 1.5;
+}
+
+.pipeline-rounds {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.round-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: var(--clr-surface-2);
+  border: 1px solid var(--clr-border);
+  border-radius: 99px;
+  padding: 0.4rem 0.85rem 0.4rem 0.5rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--clr-text);
+  position: relative;
+  transition: all 0.2s;
+}
+.round-chip:hover { border-color: var(--clr-primary); }
+
+.round-chip--locked {
+  background: var(--gradient-glow);
+  border-color: rgba(99, 102, 241, 0.25);
+  color: var(--clr-primary);
+}
+
+.round-chip--last {
+  background: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.25);
+  color: #10b981;
+}
+
+.round-chip__index {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--clr-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--clr-text-muted);
+  flex-shrink: 0;
+}
+.round-chip--locked .round-chip__index { background: var(--clr-primary); color: white; }
+.round-chip--last .round-chip__index { background: #10b981; color: white; }
+
+.round-chip__name { white-space: nowrap; }
+
+.round-chip__remove {
+  background: none; border: none; cursor: pointer; padding: 2px;
+  color: var(--clr-text-muted); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+}
+.round-chip__remove:hover { color: #ef4444; background: rgba(239, 68, 68, 0.1); }
+.round-chip__remove:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.round-connector {
+  flex-shrink: 0;
+  margin: 0 -0.1rem;
+}
+
+.add-round-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.add-round-input {
+  max-width: 240px;
+  height: 38px;
+  font-size: 0.85rem;
+}
+
+.pipeline-limit-msg {
+  font-size: 0.8rem;
+  color: var(--clr-text-muted);
+  font-style: italic;
+}
+
+.pipeline-locked-msg {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  color: #f59e0b;
+  font-weight: 600;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
+}
+
 @media (max-width: 800px) {
   .form-grid { grid-template-columns: 1fr; }
   .form-card { padding: 1.5rem; }
   .submit-btn { width: 100%; }
+  .pipeline-rounds { gap: 0.35rem; }
+  .add-round-row { flex-direction: column; align-items: stretch; }
+  .add-round-input { max-width: 100%; }
 }
 
 

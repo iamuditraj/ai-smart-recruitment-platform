@@ -53,6 +53,8 @@ export const getCandidateAppliedJobs = (email) => apiRequest(`/api/candidate/app
 
 export const getJobApplications = (jobId) => apiRequest(`/api/jobs/${encodeURIComponent(jobId)}/applications`);
 export const updateApplicationStatus = (jobId, appId, status) => apiRequest(`/api/jobs/${encodeURIComponent(jobId)}/applications/${encodeURIComponent(appId)}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
+export const updateRoundStatus = (jobId, appId, roundStatus) => apiRequest(`/api/jobs/${encodeURIComponent(jobId)}/applications/${encodeURIComponent(appId)}/status`, { method: 'PATCH', body: JSON.stringify({ round_status: roundStatus }) });
+export const advanceRound = (jobId, expectedRoundIndex) => apiRequest(`/api/jobs/${encodeURIComponent(jobId)}/advance-round`, { method: 'POST', body: JSON.stringify({ expected_round_index: expectedRoundIndex }) });
 export const bulkUpdateStatus = (jobId, action, threshold, direction) => apiRequest(`/api/jobs/${encodeURIComponent(jobId)}/applications/bulk-status`, { method: 'PATCH', body: JSON.stringify({ action, threshold, direction }) });
 
 export const getRecruiterApplications = (email) => apiRequest(`/api/recruiter/applications?email=${encodeURIComponent(email)}`);

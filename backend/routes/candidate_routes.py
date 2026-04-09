@@ -32,6 +32,8 @@ def get_candidate_applications():
             app_data['company'] = job_data.get('company', '')
             app_data['location'] = job_data.get('location', '')
             app_data['job_type'] = job_data.get('type', '')
+            app_data['job_rounds'] = job_data.get('rounds', [])
+            app_data['job_current_round_index'] = job_data.get('current_round_index', 0)
 
             if app_data.get('status') in ['Shortlisted', 'Hired']:
                 app_data['recruiter_email'] = job_data.get('recruiter_email', '')
