@@ -10,7 +10,7 @@
             <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
           </svg>
         </div>
-        <span class="brand-text">Hire<span class="brand-text--accent">AI</span></span>
+        <span class="brand-text">hire<span class="brand-text--accent">AI</span></span>
       </div>
       <div v-else class="brand-logo">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
