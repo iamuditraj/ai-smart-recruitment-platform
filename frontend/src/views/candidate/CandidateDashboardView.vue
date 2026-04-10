@@ -2,7 +2,7 @@
   <div class="dashboard">
     <div class="content-area">
       <!-- Header -->
-      <div class="dashboard__header animate-fade-in-up">
+      <div class="dashboard__header animate-fade-in-up stack-mobile">
         <div>
           <h1 class="dashboard__title">Welcome back, {{ authStore.user?.name?.split(' ')[0] || 'there' }} 👋</h1>
           <p class="dashboard__subtitle">Track your applications, improve your skills, and land your dream job.</p>
@@ -21,7 +21,7 @@
           :value="kpi.value"
           :icon="kpi.icon"
           :gradient="kpi.gradient"
-          :id="`kpi-${kpi.label.toLowerCase().replace(/\\s/g,'-')}`"
+          :id="`kpi-${kpi.label.toLowerCase().replace(/\s/g,'-')}`"
         />
       </div>
 
@@ -97,14 +97,35 @@ const applications = [
 <style scoped>
 .dashboard { min-height: 100vh; background-color: var(--clr-bg); color: var(--clr-text); }
 .dashboard__header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-4); margin-bottom: var(--sp-8); flex-wrap: wrap; }
+
+@media (max-width: 768px) {
+  .dashboard__header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
 .dashboard__title { font-size: 2rem; font-weight: 800; color: var(--clr-text); }
 .dashboard__subtitle { color: var(--clr-text-muted); margin-top: var(--sp-1); }
 
 .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--sp-4); margin-bottom: var(--sp-10); }
 
+@media (max-width: 768px) {
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 480px) {
+  .kpi-grid { grid-template-columns: 1fr; }
+}
+
 .subsection-title { font-size: 1.25rem; font-weight: 700; margin-bottom: var(--sp-4); color: var(--clr-text); }
 
 .applications-list { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--sp-6); margin-bottom: var(--sp-10); }
+
+@media (max-width: 768px) {
+  .applications-list { grid-template-columns: 1fr; }
+}
+
 .app-card { padding: var(--sp-6); transition: transform 0.2s ease, border-color 0.2s ease; background: var(--clr-surface); border: 1px solid var(--clr-border); }
 .app-card:hover { transform: translateY(-4px); border-color: var(--clr-primary); }
 .app-card__header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--sp-4); }
@@ -121,6 +142,11 @@ const applications = [
 .app-card__footer { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--clr-text-muted); }
 
 .prep-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--sp-6); }
+
+@media (max-width: 768px) {
+  .prep-grid { grid-template-columns: 1fr; }
+}
+
 .prep-card { padding: var(--sp-6); text-align: center; background: var(--clr-surface); border: 1px solid var(--clr-border); }
 .prep-card__icon { width: 50px; height: 50px; border-radius: 50%; background: var(--gradient-glow); color: var(--clr-primary); display: flex; align-items: center; justify-content: center; margin: 0 auto var(--sp-4); }
 .prep-card h3 { font-size: 1rem; font-weight: 700; margin-bottom: var(--sp-2); color: var(--clr-text); }

@@ -298,4 +298,10 @@ function showMessage(msg, type) {
   display: inline-block;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 480px) {
+  .resume-grid {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

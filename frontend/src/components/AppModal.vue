@@ -117,12 +117,18 @@ onUnmounted(() => {
 @media (max-width: 768px) {
   .v-modal-card {
     padding: var(--sp-4);
+    width: 100%;
+    max-width: 100%;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    position: fixed;
+    bottom: 0;
+    max-height: 92vh;
   }
   .v-modal-content-scroll {
-    max-height: calc(90vh - 2rem);
+    max-height: calc(92vh - 2rem);
   }
   .v-modal-overlay {
-    padding: 1rem;
+    padding: 0;
   }
 }
 </style>

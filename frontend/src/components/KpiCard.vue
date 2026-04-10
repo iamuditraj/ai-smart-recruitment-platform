@@ -41,6 +41,12 @@ defineProps({
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
+@media (max-width: 768px) {
+  .kpi-card {
+    padding: var(--sp-3) var(--sp-4);
+  }
+}
+
 .kpi-card:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
@@ -73,7 +79,7 @@ defineProps({
 
 .kpi-card__value {
   font-family: var(--font-heading);
-  font-size: 1.6rem;
+  font-size: clamp(1.2rem, 4vw, 1.6rem);
   font-weight: 800;
   letter-spacing: -0.02em;
   color: var(--clr-text);
@@ -115,7 +121,7 @@ defineProps({
 }
 
 .simple .kpi-card__value {
-  font-size: 1.5rem;
+  font-size: clamp(1.1rem, 3.5vw, 1.5rem);
 }
 
 .simple .kpi-card__label {

@@ -597,5 +597,42 @@ onUnmounted(() => {
   .setup-layout, .interview-layout, .analysis-grid {
     grid-template-columns: 1fr;
   }
+  
+  .setup-layout .setup-preview { order: 1; }
+  .setup-layout .setup-text { order: 2; }
+
+  .interview-layout .video-panel { order: 1; }
+  .interview-layout .question-panel { order: 2; }
+  
+  .active-video {
+    height: 280px;
+    object-fit: cover;
+  }
+  
+  .video-panel .main-video-box {
+    max-height: 280px;
+  }
+  
+  .live-metrics {
+    width: 140px;
+    right: 0.75rem;
+    bottom: 0.75rem;
+    padding: 0.75rem;
+  }
+  
+  .report-header {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+    gap: var(--sp-4);
+  }
+  
+  .overall-score-box {
+    text-align: center;
+  }
+  
+  .feedback-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

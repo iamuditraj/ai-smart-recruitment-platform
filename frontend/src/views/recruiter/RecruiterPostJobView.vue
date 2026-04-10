@@ -502,9 +502,9 @@ async function submitJob() {
 
 @media (max-width: 800px) {
   .form-grid { grid-template-columns: 1fr; }
-  .form-card { padding: 1.5rem; }
+  .form-card { padding: var(--sp-4) var(--sp-3); }
   .submit-btn { width: 100%; }
-  .pipeline-rounds { gap: 0.35rem; }
+  .pipeline-rounds { gap: 0.3rem; }
   .add-round-row { flex-direction: column; align-items: stretch; }
   .add-round-input { max-width: 100%; }
 }

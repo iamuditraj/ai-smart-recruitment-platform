@@ -84,7 +84,8 @@
 
       <!-- Applications Table -->
       <div v-else-if="activeApps.length > 0" class="apps-table-card card card--no-hover animate-fade-in-up" style="animation-delay:0.1s">
-        <div class="table-container">
+        <!-- Desktop Table -->
+        <div class="table-container hide-mobile">
           <table class="apps-table" id="applications-table">
             <thead>
               <tr>
@@ -171,6 +172,62 @@
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- Mobile Cards -->
+        <div class="show-mobile apps-cards-mobile">
+          <div v-for="(app, i) in activeApps" :key="app.id" class="app-card-mobile">
+            <!-- Row 1: Rank + Profile + Score -->
+            <div class="app-card-mobile__header">
+              <div class="rank-box" :class="{ 'top-rank': i < 3 }">
+                <span v-if="i === 0">🥇</span>
+                <span v-else-if="i === 1">🥈</span>
+                <span v-else-if="i === 2">🥉</span>
+                <span v-else>{{ i + 1 }}</span>
+              </div>
+              <div class="profile-cell">
+                <div class="profile-avatar" :style="`background: ${app._avatarGrad}`">{{ app._initials }}</div>
+                <div class="profile-info">
+                  <span class="profile-name">{{ app.candidate_name || app.candidate_email }}</span>
+                  <span class="profile-email">{{ app.candidate_email }}</span>
+                </div>
+              </div>
+              <div class="score-display">
+                <ScoreRing :score="app.ats_score || 0" :size="48" />
+              </div>
+            </div>
+
+            <!-- Row 2: Skills -->
+            <div class="skill-stack mt-2">
+              <span v-for="skill in (app.matched_skills || []).slice(0,3)" :key="skill" class="v-tag">{{ skill }}</span>
+              <span v-if="(app.matched_skills || []).length > 3" class="v-tag more">+{{ app.matched_skills.length - 3 }}</span>
+            </div>
+
+            <!-- Row 3: Evaluation -->
+            <div class="eval-toggle w-full mt-2" v-if="!isPipelineComplete">
+              <button
+                class="eval-btn eval-btn--cleared flex-1"
+                :class="{ active: app.round_status === 'Cleared' }"
+                @click="setRoundStatus(app, 'Cleared')"
+              >Cleared</button>
+              <button
+                class="eval-btn eval-btn--pending flex-1"
+                :class="{ active: app.round_status === 'Pending' }"
+                @click="setRoundStatus(app, 'Pending')"
+              >Pending</button>
+              <button
+                class="eval-btn eval-btn--reject flex-1"
+                :class="{ active: app.round_status === 'Reject' }"
+                @click="setRoundStatus(app, 'Reject')"
+              >Reject</button>
+            </div>
+
+            <!-- Row 4: Actions -->
+            <button class="action-btn details w-full justify-center mt-2" @click="selectedApp = app">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              <span>View Full Profile</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -766,5 +823,52 @@ details[open] .rejected-summary svg { transform: rotate(180deg); }
   .eval-toggle { flex-direction: column; }
   .eval-btn { justify-content: center; }
   .eval-btn:not(:last-child) { border-right: none; border-bottom: 1px solid var(--clr-border); }
+
+  .apps-cards-mobile {
+    display: flex;
+    flex-direction: column;
+    padding: var(--sp-3);
+  }
+
+  .app-card-mobile {
+    background: var(--clr-surface);
+    border: 1px solid var(--clr-border);
+    border-radius: var(--radius-md);
+    padding: var(--sp-4);
+    margin-bottom: var(--sp-3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+  }
+
+  .app-card-mobile__header {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    border-bottom: 1px solid var(--clr-surface-2);
+    padding-bottom: var(--sp-3);
+    margin-bottom: var(--sp-1);
+  }
+
+  .app-card-mobile__header .profile-cell {
+    flex: 1;
+  }
+
+  /* Evaluation buttons side-by-side on mobile card */
+  .app-card-mobile .eval-toggle {
+    flex-direction: row;
+    width: 100%;
+    margin-top: 0.5rem;
+  }
+  
+  .app-card-mobile .eval-btn {
+    flex: 1;
+    border-bottom: none;
+    border-right: 1px solid var(--clr-border);
+  }
+  
+  .app-card-mobile .eval-btn:last-child {
+    border-right: none;
+  }
 }
 </style>

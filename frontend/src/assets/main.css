@@ -1,4 +1,10 @@
 :root {
+  /* Breakpoints */
+  --bp-sm: 480px;
+  --bp-md: 768px;
+  --bp-lg: 1024px;
+  --bp-xl: 1280px;
+
   /* Colors - Light Theme (Default) */
   --clr-bg: #f8fafc;
   --clr-surface: #ffffff;
@@ -188,16 +194,10 @@ select {
 }
 
 .content-area {
-  padding: var(--sp-2)var(--sp-8);
+  padding: var(--sp-2) clamp(var(--sp-3), 4vw, var(--sp-8));
   width: 100%;
   max-width: 1400px;
   margin: 0 auto;
-}
-
-@media (max-width: 768px) {
-  .content-area {
-    padding: var(--sp-4) var(--sp-4);
-  }
 }
 
 .flex {
@@ -254,6 +254,10 @@ select {
 
 .grid {
   display: grid;
+}
+
+.grid > * {
+  min-width: 0;
 }
 
 .text-center {
@@ -531,5 +535,47 @@ select {
 
   .section {
     padding-block: var(--sp-12);
+  }
+}
+
+/* ===== Mobile-only utility classes ===== */
+@media (max-width: 768px) {
+  .hide-mobile {
+    display: none !important;
+  }
+
+  .show-mobile {
+    display: flex !important;
+  }
+
+  .full-mobile {
+    width: 100% !important;
+  }
+
+  .stack-mobile {
+    flex-direction: column !important;
+  }
+
+  .content-area {
+    padding: var(--sp-4) var(--sp-3) !important;
+  }
+
+  .card {
+    border-radius: var(--radius-md) !important;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .action-bar .btn,
+  .action-bar a.btn {
+    width: 100%;
+  }
+}
+
+@media (min-width: 769px) {
+  .hide-desktop {
+    display: none !important;
   }
 }

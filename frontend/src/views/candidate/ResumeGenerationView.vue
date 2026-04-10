@@ -9,7 +9,10 @@
           <p class="rg-subtitle">Fill in your details and get a professional resume instantly</p>
         </div>
         <div class="rg-header-actions">
-          <button class="btn btn-ghost" id="rg-reset-btn" @click="confirmReset">Reset</button>
+          <button class="btn btn-outline hide-desktop" @click="isPreviewVisible = !isPreviewVisible">
+            {{ isPreviewVisible ? 'Hide Preview' : 'Show Preview' }}
+          </button>
+          <button class="btn btn-ghost hide-mobile" id="rg-reset-btn" @click="confirmReset">Reset</button>
           <button class="btn btn-outline" id="rg-print-btn" @click="printResume">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
             Download PDF
@@ -18,7 +21,7 @@
       </div>
 
       <!-- ===== Main Split Layout ===== -->
-      <div class="rg-split">
+      <div class="rg-split" :class="{ 'rg-show-preview': isPreviewVisible }">
 
         <!-- ====== LEFT: Form Panel ====== -->
         <div class="rg-form-panel">
@@ -152,6 +155,7 @@ const { isGenerating } = useResumeAI()
 
 // Responsive preview scale
 const previewScale = ref(0.5)
+const isPreviewVisible = ref(false)
 
 function computePreviewScale() {
   const wrapperEl = document.getElementById('rg-preview-wrapper')
@@ -480,6 +484,59 @@ async function handleSubmit() {
 @media (max-width: 900px) {
   .rg-step {
     padding: 0.65rem 0.75rem;
+    min-width: 80px;
+  }
+}
+
+@media (max-width: 768px) {
+  .rg-split {
+    gap: var(--sp-3);
+  }
+
+  .rg-preview-panel {
+    display: none;
+  }
+
+  .rg-show-preview .rg-preview-panel {
+    display: flex;
+  }
+
+  .rg-form-body {
+    padding: var(--sp-4);
+  }
+
+  .rg-form-nav .btn {
+    min-width: 80px;
+  }
+
+  /* Stepper: inactive steps shrink, active step expands to show label */
+  .rg-step {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0.6rem 0.15rem;
+    justify-content: center;
+    transition: flex 0.25s ease;
+  }
+
+  .rg-step__label {
+    display: none;
+  }
+
+  .rg-step--active {
+    flex: 2.5 1 0;
+    flex-direction: column;
+    gap: 2px;
+    padding: 0.6rem 0.4rem;
+  }
+
+  .rg-step--active .rg-step__label {
+    display: block;
+    font-size: 0.6rem;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
   }
 }
 
