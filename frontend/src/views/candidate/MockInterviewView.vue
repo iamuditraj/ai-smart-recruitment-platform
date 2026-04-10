@@ -598,8 +598,11 @@ onUnmounted(() => {
     grid-template-columns: 1fr;
   }
   
-  .interview-layout .question-panel { order: 1; }
-  .interview-layout .video-panel { order: 2; }
+  .setup-layout .setup-preview { order: 1; }
+  .setup-layout .setup-text { order: 2; }
+
+  .interview-layout .video-panel { order: 1; }
+  .interview-layout .question-panel { order: 2; }
   
   .active-video {
     height: 280px;

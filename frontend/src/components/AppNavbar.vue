@@ -64,14 +64,17 @@
           <img v-if="authStore.user?.photo" :src="authStore.user.photo" alt="Avatar" class="avatar-img">
           <span v-else>{{ authStore.user?.name?.charAt(0).toUpperCase() }}</span>
         </div>
+        <!-- Show user info when sidebar is expanded OR when mobile drawer is open -->
         <div class="user-info" v-if="!uiStore.isSidebarCollapsed || isOpen">
           <span class="user-name">{{ authStore.user?.name }}</span>
           <span class="user-role">{{ authStore.role }}</span>
         </div>
+        <!-- Always show logout when expanded or mobile drawer open -->
         <button v-if="!uiStore.isSidebarCollapsed || isOpen" @click="handleLogout" class="logout-btn" title="Sign Out">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
         </button>
       </div>
+      <!-- Collapsed desktop-only logout icon -->
       <button v-if="uiStore.isSidebarCollapsed && !isOpen" @click="handleLogout" class="nav-item signout-btn-collapsed" title="Logout">
         <span class="nav-icon">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -215,11 +218,28 @@ function handleLogout() {
     position: fixed;
     left: 0;
     top: 0;
+    width: 280px !important; /* override collapsed state on mobile */
     transform: translateX(-100%);
   }
 
   .sidebar--open {
     transform: translateX(0);
+  }
+
+  /* When drawer is open, always show full expanded layout, ignore collapsed CSS */
+  .sidebar--open.sidebar--collapsed .nav-item {
+    justify-content: flex-start;
+    padding: 0.75rem 1rem;
+  }
+
+  .sidebar--open.sidebar--collapsed .sidebar__user {
+    justify-content: flex-start;
+    padding: 0.5rem;
+  }
+
+  .sidebar--open.sidebar--collapsed .sidebar__header {
+    justify-content: space-between;
+    padding: 0 1.5rem;
   }
 }
 

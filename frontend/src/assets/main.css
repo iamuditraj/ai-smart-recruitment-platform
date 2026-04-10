@@ -256,6 +256,10 @@ select {
   display: grid;
 }
 
+.grid > * {
+  min-width: 0;
+}
+
 .text-center {
   text-align: center;
 }

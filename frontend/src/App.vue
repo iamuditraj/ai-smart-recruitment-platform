@@ -219,6 +219,7 @@ const currentPageTitle = computed(() => {
   flex: 1;
   padding: 0;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 #app-root:not(.has-sidebar) {

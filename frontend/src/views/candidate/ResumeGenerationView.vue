@@ -508,6 +508,36 @@ async function handleSubmit() {
   .rg-form-nav .btn {
     min-width: 80px;
   }
+
+  /* Stepper: inactive steps shrink, active step expands to show label */
+  .rg-step {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0.6rem 0.15rem;
+    justify-content: center;
+    transition: flex 0.25s ease;
+  }
+
+  .rg-step__label {
+    display: none;
+  }
+
+  .rg-step--active {
+    flex: 2.5 1 0;
+    flex-direction: column;
+    gap: 2px;
+    padding: 0.6rem 0.4rem;
+  }
+
+  .rg-step--active .rg-step__label {
+    display: block;
+    font-size: 0.6rem;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
 }
 
 @media (max-width: 500px) {
