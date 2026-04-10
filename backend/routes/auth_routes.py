@@ -127,10 +127,14 @@ def google_auth():
             }
         })
     else:
+        # User not found
+        if not role:
+            # Login attempt but no account found
+            return jsonify({"status": "error", "code": "USER_NOT_FOUND", "message": "Account not found. Please sign up."}), 404
+
         # New Google user - need a role
-        if not role or role not in ['candidate', 'recruiter']:
-            # Default to candidate if none provided and it's a new user
-            role = 'candidate'
+        if role not in ['candidate', 'recruiter']:
+            return jsonify({"status": "error", "message": "Invalid role specified."}), 400
 
         # Write the role-lookup doc
         g.db.collection('user_index').document(email).set({'role': role})
