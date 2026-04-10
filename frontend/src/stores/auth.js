@@ -44,6 +44,30 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function loginWithGoogle(role = null) {
+    try {
+      const { signInWithPopup } = await import('firebase/auth')
+      const { auth, googleProvider } = await import('../utils/firebase')
+      
+      const result = await signInWithPopup(auth, googleProvider)
+      const idToken = await result.user.getIdToken()
+      
+      // We import googleAuth from api here since it acts nicely alongside the others
+      const { googleAuth } = await import('../utils/api')
+      const data = await googleAuth(idToken, role)
+      
+      user.value = data.user
+      localStorage.setItem('auth_user', JSON.stringify(data.user))
+      localStorage.setItem('user_role', data.user.role)
+      return { success: true }
+    } catch (error) {
+      if (error.code === 'auth/popup-closed-by-user') {
+         return { success: false, message: 'Google sign in was cancelled' };
+      }
+      return handleApiError('Google Auth', error)
+    }
+  }
+
   async function updateProfile(profileData) {
     try {
       const data = await updateProfileApi({ ...profileData, email: user.value.email })
@@ -89,6 +113,7 @@ export const useAuthStore = defineStore('auth', () => {
     isCandidate,
     login,
     signup,
+    loginWithGoogle,
     updateProfile,
     uploadResume: resumeActions.uploadResume,
     setDefaultResume: resumeActions.setDefaultResume,

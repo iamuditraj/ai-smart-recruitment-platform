@@ -40,6 +40,12 @@
           </div>
         </AuthForm>
 
+        <div class="divider">
+          <span>OR</span>
+        </div>
+
+        <GoogleAuthButton @error="errorMessage = $event" />
+
         <template #footer>
           <p class="text-sm text-muted">Don't have an account? <RouterLink to="/signup" class="gradient-text font-bold">Sign up</RouterLink></p>
         </template>
@@ -52,6 +58,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import AuthLayout from '@/components/AuthLayout.vue'
 import AuthForm from '@/components/AuthForm.vue'
+import GoogleAuthButton from '@/components/GoogleAuthButton.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -85,5 +92,23 @@ async function handleLogin() {
 
 .forgot-link:hover {
   text-decoration: underline;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 1.5rem 0 0.5rem;
+  color: var(--clr-text-muted);
+  font-size: 0.875rem;
+}
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid var(--clr-border);
+}
+.divider span {
+  padding: 0 10px;
 }
 </style>
