@@ -73,7 +73,7 @@
       <div class="container">
         <div class="section-header text-center">
           <span class="badge badge-primary">Process</span>
-          <h2 class="section-title">How HireAI Works</h2>
+          <h2 class="section-title">How hireAI Works</h2>
         </div>
         <div class="steps">
           <div v-for="(step, i) in steps" :key="step.title" class="step">

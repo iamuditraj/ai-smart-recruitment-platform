@@ -1,6 +1,6 @@
 <template>
   <AuthLayout subtitle="Connect to your recruitment workspace">
-    <template #title>Hire<span class="gradient-text">AI</span> Portal</template>
+    <template #title>hire<span class="gradient-text">AI</span> Portal</template>
 
         <AuthForm 
           @submit="handleLogin" 
