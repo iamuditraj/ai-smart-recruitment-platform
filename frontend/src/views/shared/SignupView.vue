@@ -82,14 +82,15 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import AuthLayout from '@/components/AuthLayout.vue'
 import AuthForm from '@/components/AuthForm.vue'
 import GoogleAuthButton from '@/components/GoogleAuthButton.vue'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 
 const role = ref('candidate')
@@ -98,6 +99,12 @@ const email = ref('')
 const password = ref('')
 const isLoading = ref(false)
 const errorMessage = ref('')
+
+watch(() => route.query.noAccount, (val) => {
+  if (val) {
+    errorMessage.value = 'Google account not found. Please create one to continue.'
+  }
+}, { immediate: true })
 
 async function handleSignup() {
   isLoading.value = true

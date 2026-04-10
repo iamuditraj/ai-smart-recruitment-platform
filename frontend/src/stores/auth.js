@@ -64,7 +64,12 @@ export const useAuthStore = defineStore('auth', () => {
       if (error.code === 'auth/popup-closed-by-user') {
          return { success: false, message: 'Google sign in was cancelled' };
       }
-      return handleApiError('Google Auth', error)
+      const isNotFound = error.message === 'Account not found. Please sign up.';
+      return { 
+        success: false, 
+        message: error.message || 'Google Auth failed', 
+        code: isNotFound ? 'USER_NOT_FOUND' : undefined 
+      };
     }
   }
 

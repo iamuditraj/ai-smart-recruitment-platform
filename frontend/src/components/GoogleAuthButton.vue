@@ -45,7 +45,11 @@ const handleGoogleAuth = async () => {
   if (result.success) {
     router.push('/dashboard')
   } else {
-    emit('error', result.message || 'Google Auth failed')
+    if (result.code === 'USER_NOT_FOUND') {
+      router.push({ path: '/signup', query: { noAccount: '1' } })
+    } else {
+      emit('error', result.message || 'Google Auth failed')
+    }
   }
 }
 </script>
