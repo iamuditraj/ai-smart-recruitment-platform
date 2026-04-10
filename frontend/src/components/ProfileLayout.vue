@@ -83,5 +83,6 @@ defineEmits(['save'])
 @media (max-width: 600px) {
   :global(.form-grid) { grid-template-columns: 1fr; }
   :global(.header-content) { flex-direction: column; align-items: flex-start; gap: 1rem; }
+  .profile-card, .profile-form { padding: var(--sp-4) !important; }
 }
 </style>

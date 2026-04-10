@@ -305,5 +305,11 @@ onUnmounted(() => { if (timerInterval) clearInterval(timerInterval) })
 .result-label { color: var(--clr-text-light); font-size: 1rem; }
 
 /* Empty State */
-
+@media (max-width: 768px) {
+  .question-card { padding: var(--sp-4); }
+  .option-label { padding: 0.6rem 0.8rem; }
+  .submit-row { flex-direction: column; align-items: stretch; gap: var(--sp-3); }
+  .submit-row .btn { width: 100%; }
+  .timer { font-size: 0.8rem; }
+}
 </style>

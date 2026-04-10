@@ -147,6 +147,7 @@ const badgeClass = computed(() => {
   align-items: center;
   gap: 0.75rem;
   margin-bottom: 0.6rem;
+  flex-wrap: wrap;
 }
 
 .breakdown-label {
@@ -155,6 +156,13 @@ const badgeClass = computed(() => {
   width: 130px;
   flex-shrink: 0;
   font-weight: 500;
+}
+
+@media (max-width: 768px) {
+  .breakdown-label {
+    width: auto;
+    min-width: 90px;
+  }
 }
 
 .breakdown-bar-track {

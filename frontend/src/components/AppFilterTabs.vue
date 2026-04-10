@@ -55,6 +55,20 @@ function getValue(tab) {
   flex-wrap: wrap;
 }
 
+@media (max-width: 768px) {
+  .app-filter-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .app-filter-tabs::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 .filter-tab {
   display: inline-flex;
   align-items: center;

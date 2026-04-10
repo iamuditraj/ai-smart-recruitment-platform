@@ -6,12 +6,29 @@
         title="Available Opportunities" 
         subtitle="Find jobs and internships posted by recruiters">
         <template #actions>
-          <div class="search-bar card">
+          <div class="search-bar card hide-mobile">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input v-model="searchQuery" type="text" placeholder="Search by title, company or role...">
           </div>
+          <button 
+            class="icon-btn hide-desktop" 
+            :class="{ 'btn-primary': isMobileSearchVisible }"
+            @click="isMobileSearchVisible = !isMobileSearchVisible"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          </button>
         </template>
       </PageHeader>
+
+      <!-- Mobile Search Input (Toggleable) -->
+      <Transition name="fade-down">
+        <div v-if="isMobileSearchVisible" class="mobile-search hide-desktop animate-fade-in-up">
+          <div class="search-bar card">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input v-model="searchQuery" type="text" placeholder="Search for jobs..." ref="mobileSearchInput">
+          </div>
+        </div>
+      </Transition>
 
       <!-- Filters -->
       <AppFilterTabs
@@ -155,6 +172,7 @@ const parsedResumeResult = ref(null)
 const isPreviewing = ref(false)
 const appliedJobIds = ref(new Set())
 const isSubmitting = ref(false)
+const isMobileSearchVisible = ref(false)
 
 
 
@@ -303,6 +321,21 @@ onMounted(() => {
 
 
 .jobs-grid { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; }
+
+@media (max-width: 480px) {
+  .jobs-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.mobile-search {
+  margin-top: -1rem;
+  margin-bottom: 2rem;
+}
+
+.mobile-search .search-bar {
+  max-width: 100%;
+}
 
 .btn-applied {
   background: rgba(16, 185, 129, 0.12);

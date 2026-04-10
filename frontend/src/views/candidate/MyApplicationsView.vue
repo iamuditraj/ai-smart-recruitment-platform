@@ -306,6 +306,7 @@ onMounted(fetchApplications)
 
 .round-stepper {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   padding-bottom: 0.5rem;
 }
 
@@ -461,9 +462,34 @@ details[open] .chevron { transform: rotate(180deg); }
 
 /* ═══ Responsive ═════════════════════════════════════════════ */
 @media (max-width: 768px) {
-  .page-header { flex-direction: column; }
-  .page-title { font-size: 1.5rem; }
-  .app-header { flex-direction: column; align-items: flex-start; }
-  .app-card__right { width: 100%; justify-content: space-between; }
+  .app-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--sp-3);
+  }
+
+  .app-card__right {
+    width: 100%;
+    justify-content: space-between;
+    border-top: 1px solid var(--clr-border);
+    padding-top: var(--sp-3);
+    margin-top: var(--sp-2);
+  }
+
+  .recruiter-contact {
+    align-items: flex-start;
+  }
+
+  .stats-row :deep(.kpi-card__value) {
+    font-size: 1.2rem !important;
+  }
+
+  .app-job-title {
+    max-width: calc(100vw - 120px);
+  }
+
+  .comm-body {
+    font-size: 0.8rem;
+  }
 }
 </style>

@@ -45,7 +45,7 @@ defineProps({
 }
 
 .page-title {
-  font-size: 2rem;
+  font-size: clamp(1.4rem, 5vw, 2rem);
   font-weight: 800;
   letter-spacing: -0.02em;
 }
@@ -71,5 +71,17 @@ defineProps({
   display: flex;
   gap: 1rem;
   align-items: center;
+}
+
+@media (max-width: 768px) {
+  .page-header {
+    flex-direction: column;
+    gap: var(--sp-3);
+  }
+
+  .header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
 }
 </style>
