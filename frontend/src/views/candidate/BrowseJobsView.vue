@@ -97,9 +97,22 @@
             <!-- Right Pane: Upload/Preview -->
             <div class="modal-pane action-pane">
               <h3 class="font-bold mb-4" style="font-size: 1.25rem;">Application Preview</h3>
+
+              <!-- Tab Switcher -->
+              <div v-if="!previewResult && !isPreviewing" class="apply-mode-tabs">
+                <button :class="['mode-tab', { active: applyMode === 'upload' }]" @click="switchApplyMode('upload')">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  Upload File
+                </button>
+                <button :class="['mode-tab', { active: applyMode === 'hub' }]" @click="switchApplyMode('hub')">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                  Choose from Hub
+                </button>
+              </div>
               
+              <!-- Upload Mode -->
               <AppDropzone
-                v-if="!previewResult && !isPreviewing"
+                v-if="applyMode === 'upload' && !previewResult && !isPreviewing"
                 customClass="upload-dropzone"
                 inputId="browse-jobs-upload"
                 accept=".pdf,.docx,.doc"
@@ -110,16 +123,51 @@
                    <span>Select Resume (PDF/DOCX)</span>
                  </label>
               </AppDropzone>
+
+              <!-- Hub Mode -->
+              <div v-if="applyMode === 'hub' && !previewResult && !isPreviewing" class="hub-resume-section">
+                <div v-if="isLoadingHubResumes" class="text-center" style="padding: 2rem 0;">
+                  <AppSpinner size="sm" />
+                  <p class="text-muted mt-2" style="font-size: 0.85rem;">Loading your resumes...</p>
+                </div>
+                <div v-else-if="hubResumes.length === 0" class="hub-empty-state">
+                  <p>No resumes in your hub yet.</p>
+                  <button class="btn btn-outline btn-sm mt-2" @click="switchApplyMode('upload')">
+                    Upload one now
+                  </button>
+                </div>
+                <div v-else class="hub-resume-list">
+                  <div
+                    v-for="resume in hubResumes" :key="resume.id"
+                    class="hub-resume-item"
+                    :class="{ selected: selectedHubResume?.id === resume.id }"
+                    @click="selectHubResume(resume)"
+                  >
+                    <div class="hub-resume-info">
+                      <span class="hub-resume-name">{{ resume.resumeName }}</span>
+                      <span class="hub-resume-date">{{ formatHubDate(resume.uploadedAt) }}</span>
+                    </div>
+                    <span v-if="resume.isDefault" class="hub-default-tag">Default</span>
+                    <svg v-if="selectedHubResume?.id === resume.id" class="hub-check-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  </div>
+                  <button
+                    v-if="selectedHubResume"
+                    class="btn btn-primary w-full mt-4"
+                    @click="previewFromHub"
+                  >
+                    Preview ATS Score
+                  </button>
+                </div>
+              </div>
               
-              <div v-else-if="isPreviewing" class="scanning-state text-center">
+              <div v-if="isPreviewing" class="scanning-state text-center">
                  <div class="scanner"></div>
                  <p class="mt-4 text-primary font-bold">Scanning against ATS...</p>
                  <p class="text-sm text-muted mt-2">Parsing skills and experience.</p>
               </div>
               
-              <div v-else-if="previewResult" class="preview-results">
+              <div v-if="previewResult" class="preview-results">
                   <AtsScorePanel
-                    v-if="previewResult"
                     :score="previewResult.score || previewResult.ats_score"
                     :breakdown="previewResult.score_breakdown"
                     :matchedSkills="previewResult.matched_skills"
@@ -131,7 +179,7 @@
                       <span v-if="!isSubmitting">Submit Official Application</span>
                       <AppSpinner v-else size="sm" />
                     </button>
-                    <button class="btn-text w-full" @click="resetPreview" :disabled="isSubmitting">Upload Different Resume</button>
+                    <button class="btn-text w-full" @click="resetPreview" :disabled="isSubmitting">Choose Different Resume</button>
                   </div>
               </div>
             </div>
@@ -173,6 +221,12 @@ const isPreviewing = ref(false)
 const appliedJobIds = ref(new Set())
 const isSubmitting = ref(false)
 const isMobileSearchVisible = ref(false)
+
+// Hub resume state
+const applyMode = ref('upload')       // 'upload' | 'hub'
+const hubResumes = ref([])
+const selectedHubResume = ref(null)
+const isLoadingHubResumes = ref(false)
 
 
 
@@ -220,6 +274,8 @@ function initiateApply(job) {
   parsedResumeResult.value = null
   isPreviewing.value = false
   isSubmitting.value = false
+  applyMode.value = 'upload'
+  selectedHubResume.value = null
 }
 
 function closeApplyModal() {
@@ -231,6 +287,56 @@ function resetPreview() {
   previewResult.value = null
   parsedResumeResult.value = null
   selectedResumeFile.value = null
+  selectedHubResume.value = null
+}
+
+function switchApplyMode(mode) {
+  applyMode.value = mode
+  resetPreview()
+  if (mode === 'hub') fetchHubResumes()
+}
+
+async function fetchHubResumes() {
+  if (!authStore.user?.email) return
+  isLoadingHubResumes.value = true
+  try {
+    await authStore.fetchResumes()
+    hubResumes.value = authStore.resumes || []
+  } catch (err) {
+    console.error('Failed to load hub resumes:', err)
+  } finally {
+    isLoadingHubResumes.value = false
+  }
+}
+
+function selectHubResume(resume) {
+  selectedHubResume.value = selectedHubResume.value?.id === resume.id ? null : resume
+}
+
+async function previewFromHub() {
+  if (!selectedHubResume.value || !selectedJobForApply.value) return
+  isPreviewing.value = true
+  try {
+    const formData = new FormData()
+    formData.append('job_id', selectedJobForApply.value.id)
+    formData.append('resume_id', selectedHubResume.value.id)
+    formData.append('candidate_email', authStore.user?.email || '')
+    const data = await previewScore(formData)
+    previewResult.value = data.ats_result
+    parsedResumeResult.value = data.llm_parsed_resume
+    showToast('ATS Score generated successfully!', 'success')
+  } catch (err) {
+    console.error(err)
+    showToast(err.message || 'Failed to generate preview.', 'error')
+  } finally {
+    isPreviewing.value = false
+  }
+}
+
+function formatHubDate(dateStr) {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 async function handlePreviewUpload(filesOrEvent) {
@@ -261,15 +367,23 @@ async function handlePreviewUpload(filesOrEvent) {
 }
 
 async function submitFinalApplication() {
-  if (!selectedResumeFile.value || !selectedJobForApply.value) return;
+  const hasFile = applyMode.value === 'upload' && selectedResumeFile.value
+  const hasHub = applyMode.value === 'hub' && selectedHubResume.value
+  if ((!hasFile && !hasHub) || !selectedJobForApply.value) return;
 
   isSubmitting.value = true;
   
   try {
     const formData = new FormData();
-    formData.append('resume', selectedResumeFile.value);
     formData.append('job_id', selectedJobForApply.value.id);
     formData.append('candidate_email', authStore.user?.email || '');
+
+    if (applyMode.value === 'upload') {
+      formData.append('resume', selectedResumeFile.value);
+    } else {
+      formData.append('resume_id', selectedHubResume.value.id);
+    }
+
     if (previewResult.value) {
       formData.append('ats_result', JSON.stringify(previewResult.value));
     }
@@ -468,7 +582,108 @@ onMounted(() => {
   100% { transform: translateX(-100%); }
 }
 
+/* Apply Mode Tabs */
+.apply-mode-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 1.25rem;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--clr-border);
+}
+.mode-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--clr-surface);
+  color: var(--clr-text-muted);
+}
+.mode-tab:first-child { border-right: 1px solid var(--clr-border); }
+.mode-tab.active {
+  background: var(--clr-primary);
+  color: white;
+}
+.mode-tab:not(.active):hover {
+  background: var(--clr-surface-2);
+}
 
+/* Hub Resume Section */
+.hub-resume-section {
+  min-height: 120px;
+}
+.hub-empty-state {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--clr-text-muted);
+  font-size: 0.9rem;
+}
+.hub-resume-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.hub-resume-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--clr-surface);
+}
+.hub-resume-item:hover {
+  border-color: var(--clr-primary);
+  background: rgba(99, 102, 241, 0.04);
+}
+.hub-resume-item.selected {
+  border-color: var(--clr-primary);
+  background: rgba(99, 102, 241, 0.08);
+  box-shadow: 0 0 0 1px var(--clr-primary);
+}
+.hub-resume-info {
+  flex: 1;
+  min-width: 0;
+}
+.hub-resume-name {
+  display: block;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--clr-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hub-resume-date {
+  font-size: 0.75rem;
+  color: var(--clr-text-muted);
+}
+.hub-default-tag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.12);
+  color: var(--clr-primary);
+  flex-shrink: 0;
+}
+.hub-check-icon {
+  color: var(--clr-primary);
+  flex-shrink: 0;
+}
 
 .jobs-loading { text-align: center; padding: 4rem; }
 </style>
