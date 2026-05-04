@@ -9,7 +9,7 @@ setup_backend_path()
 from firebase_admin import firestore
 
 BASE_URL = "http://127.0.0.1:5001"
-JOB_ID = "4t1pRjLsLcC230Ki6FKf"
+JOB_ID = "v8MltWM3tu9Ovw8uV6ML"
 TEST_RESUMES_DIR = os.path.join(os.path.dirname(__file__), "Test resume")
 
 def ensure_candidate1_exists():
