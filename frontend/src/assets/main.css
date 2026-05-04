@@ -575,7 +575,8 @@ select {
 }
 
 @media (min-width: 769px) {
-  .hide-desktop {
+  .hide-desktop,
+  .show-mobile {
     display: none !important;
   }
 }

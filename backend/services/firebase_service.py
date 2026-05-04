@@ -13,6 +13,11 @@ def init_firebase():
     # Priority 2: File path from ENV or default
     key_path = os.getenv("FIREBASE_SERVICE_ACCOUNT_KEY", "serviceAccountKey.json")
     
+    # Resolve relative paths based on backend directory to support running from subdirectories
+    if key_path and not os.path.isabs(key_path):
+        backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        key_path = os.path.join(backend_dir, key_path)
+    
     try:
         if key_json:
             # Parse JSON string into a dict and initialize

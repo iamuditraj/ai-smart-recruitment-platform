@@ -16,9 +16,9 @@ def seed_candidates():
     password = "12345678"
     hashed_password = generate_password_hash(password)
     
-    print(f"🚀 Starting seeding of 14 candidates (candidate2 to candidate15)...")
+    print(f"🚀 Starting seeding of 15 candidates (candidate1 to candidate15)...")
 
-    for i in range(2, 16):
+    for i in range(1, 16):
         email = f"candidate{i}@test.com"
         name = f"candidate{i}"
         role = "candidate"
