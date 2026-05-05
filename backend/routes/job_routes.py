@@ -6,6 +6,7 @@ from routes.decorators import handle_route_errors, require_db
 from services.db_helpers import (
     serialize_timestamps, build_ats_pipeline,
     get_job_with_parsed_jd, enrich_app_with_candidate,
+    get_resume_file_from_hub,
     DEFAULT_ROUNDS, validate_rounds, advance_round,
 )
 
@@ -124,9 +125,19 @@ def handle_specific_job(job_id):
 def preview_score():
     job_id = request.form.get('job_id')
     resume_file = request.files.get('resume')
+    resume_id = request.form.get('resume_id')
+    candidate_email = request.form.get('candidate_email')
     
-    if not all([job_id, resume_file]):
-        return jsonify({"status": "error", "message": "Missing job_id or resume file"}), 400
+    if not job_id:
+        return jsonify({"status": "error", "message": "Missing job_id"}), 400
+
+    # If no file uploaded, try fetching from Resume Hub
+    if not resume_file:
+        if not resume_id or not candidate_email:
+            return jsonify({"status": "error", "message": "Provide a resume file or resume_id + candidate_email"}), 400
+        resume_file, err = get_resume_file_from_hub(g.db, candidate_email, resume_id)
+        if err:
+            return jsonify({"status": "error", "message": err}), 400
 
     job_data, jd_text, parsed_jd = get_job_with_parsed_jd(g.db, job_id)
     if not job_data:
@@ -148,9 +159,18 @@ def apply_for_job():
     job_id = request.form.get('job_id')
     candidate_email = request.form.get('candidate_email')
     resume_file = request.files.get('resume')
+    resume_id = request.form.get('resume_id')
     
-    if not all([job_id, candidate_email, resume_file]):
-        return jsonify({"status": "error", "message": "Missing application fields or resume file"}), 400
+    if not all([job_id, candidate_email]):
+        return jsonify({"status": "error", "message": "Missing job_id or candidate_email"}), 400
+
+    # If no file uploaded, try fetching from Resume Hub
+    if not resume_file:
+        if not resume_id:
+            return jsonify({"status": "error", "message": "Provide a resume file or resume_id"}), 400
+        resume_file, err = get_resume_file_from_hub(g.db, candidate_email, resume_id)
+        if err:
+            return jsonify({"status": "error", "message": err}), 400
         
     existing = g.db.collection('jobs').document(job_id).collection('applications').where('candidate_email', '==', candidate_email).get()
     if len(existing) > 0:

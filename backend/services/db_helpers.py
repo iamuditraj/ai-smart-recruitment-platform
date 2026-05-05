@@ -79,6 +79,45 @@ def build_ats_pipeline(resume_file, jd_text: str, parsed_jd: dict):
     return ats_result, llm_parsed_resume
 
 
+def get_resume_file_from_hub(db, candidate_email, resume_id):
+    """Fetch a resume from the candidate's Resume Hub and return a file-like object.
+
+    Looks up ``candidates/{candidate_email}/resumes/{resume_id}`` in Firestore,
+    decodes the stored base64 data-URI back into raw bytes, and wraps them in
+    a :class:`io.BytesIO` with a ``.filename`` attribute so the result is
+    compatible with :func:`build_ats_pipeline`.
+
+    Returns ``(file_like_obj, None)`` on success or ``(None, error_string)``
+    on failure.
+    """
+    import base64
+
+    resume_doc = (db.collection('candidates')
+                    .document(candidate_email)
+                    .collection('resumes')
+                    .document(resume_id)
+                    .get())
+
+    if not resume_doc.exists:
+        return None, "Resume not found in your hub"
+
+    data = resume_doc.to_dict()
+    data_uri = data.get('resumeUrl', '')
+    filename = data.get('resumeName', 'resume.pdf')
+
+    # data_uri format: "data:application/pdf;base64,<base64_string>"
+    if ',' not in data_uri:
+        return None, "Stored resume data is invalid"
+
+    b64_string = data_uri.split(',', 1)[1]
+    file_bytes = base64.b64decode(b64_string)
+
+    file_obj = io.BytesIO(file_bytes)
+    file_obj.filename = filename  # mimics Werkzeug FileStorage.filename
+
+    return file_obj, None
+
+
 def save_resume_to_profile(db, email, resume_id, resume_doc, parent_extras=None):
     """
     Save a resume document to ``candidates/{email}/resumes/{resume_id}``.
