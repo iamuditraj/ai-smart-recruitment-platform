@@ -29,7 +29,6 @@ def handle_profile():
         
         updated_doc = user_ref.get()
         user_data = updated_doc.to_dict()
-        user_data.pop('password', None)
         
         return jsonify({
             "status": "success",
@@ -52,7 +51,6 @@ def handle_profile():
             return jsonify({"status": "error", "message": "User not found"}), 404
             
         user_data = user_doc.to_dict()
-        user_data.pop('password', None)
         
         return jsonify({
             "status": "success",

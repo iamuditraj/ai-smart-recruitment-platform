@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { loginUser, signupUser, updateProfile as updateProfileApi, getProfile } from '../utils/api'
+import { signupUser, updateProfile as updateProfileApi, getProfile } from '../utils/api'
 import { useResumeActions } from '../composables/useResumeActions'
 
 export const useAuthStore = defineStore('auth', () => {
@@ -22,13 +22,21 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function login(email, password) {
     try {
-      const data = await loginUser(email, password)
-      user.value = data.user
-      localStorage.setItem('auth_user', JSON.stringify(data.user))
-      localStorage.setItem('user_role', data.user.role)
-      return { success: true }
+      const { auth } = await import('../utils/firebase');
+      const { signInWithEmailAndPassword } = await import('firebase/auth');
+      const { getProfile } = await import('../utils/api');
+
+      await signInWithEmailAndPassword(auth, email, password);
+      
+      const data = await getProfile(email);
+      user.value = data.user;
+      localStorage.setItem('auth_user', JSON.stringify(data.user));
+      if (data.user.role) {
+        localStorage.setItem('user_role', data.user.role);
+      }
+      return { success: true };
     } catch (error) {
-      return handleApiError('Login', error)
+      return handleApiError('Login', error);
     }
   }
 

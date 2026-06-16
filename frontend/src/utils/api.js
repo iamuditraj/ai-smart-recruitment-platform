@@ -20,7 +20,7 @@ export async function apiRequest(endpoint, options = {}) {
     return data;
 }
 
-export const loginUser = (email, password) => apiRequest('/api/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+
 export const signupUser = (userData) => apiRequest('/api/signup', { method: 'POST', body: JSON.stringify(userData) });
 export const googleAuth = (idToken, role) => apiRequest('/api/google-auth', { method: 'POST', body: JSON.stringify({ idToken, role }) });
 
