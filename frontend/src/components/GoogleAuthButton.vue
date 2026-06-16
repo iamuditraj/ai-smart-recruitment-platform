@@ -26,6 +26,10 @@ const props = defineProps({
   role: {
     type: String,
     default: null // In login it will be null, in signup it will be 'candidate' or 'recruiter'
+  },
+  tenantId: {
+    type: String,
+    default: ''
   }
 })
 
@@ -36,10 +40,15 @@ const authStore = useAuthStore()
 const isLoading = ref(false)
 
 const handleGoogleAuth = async () => {
+  if (props.role && !props.tenantId) {
+    emit('error', 'Please enter your College ID or Company ID before signing up with Google.')
+    return
+  }
+
   isLoading.value = true
   emit('error', '') // Clear any previous errors
 
-  const result = await authStore.loginWithGoogle(props.role)
+  const result = await authStore.loginWithGoogle(props.role, props.tenantId)
 
   isLoading.value = false
   if (result.success) {

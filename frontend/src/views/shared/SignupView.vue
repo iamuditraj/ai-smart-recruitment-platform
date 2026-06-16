@@ -97,7 +97,11 @@
           <span>OR</span>
         </div>
 
-        <GoogleAuthButton :role="role" @error="errorMessage = $event" />
+        <GoogleAuthButton 
+          :role="role" 
+          :tenantId="role === 'candidate' || role === 'college' ? college_id : company_id" 
+          @error="errorMessage = $event" 
+        />
 
         <template #footer>
           <p class="text-sm text-muted">Already have an account? <RouterLink to="/login" class="gradient-text font-bold">Sign in</RouterLink></p>

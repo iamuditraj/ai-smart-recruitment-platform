@@ -93,35 +93,39 @@ def google_auth():
     data = request.json
     id_token = data.get('idToken')
     role = data.get('role')
+    tenant_id = data.get('tenant_id')
 
     if not id_token:
         return jsonify({"status": "error", "message": "Missing ID token"}), 400
 
     try:
         decoded_token = firebase_auth.verify_id_token(id_token)
+        uid = decoded_token.get('uid')
         email = decoded_token.get('email')
         name = decoded_token.get('name', '')
     except Exception as e:
         return jsonify({"status": "error", "message": "Invalid Google token"}), 401
 
-    if not email:
-        return jsonify({"status": "error", "message": "No email in token"}), 400
+    if not uid:
+        return jsonify({"status": "error", "message": "No uid in token"}), 400
 
     # Check if user exists
-    user_role, collection_name = get_user_collection(g.db, email)
+    user_role, collection_name = get_user_collection(g.db, uid)
 
     if user_role:
         # Existing user - log them in
-        user_doc = g.db.collection(collection_name).document(email).get()
+        user_doc = g.db.collection(collection_name).document(uid).get()
         user_data = user_doc.to_dict() if user_doc.exists else {}
         
         return jsonify({
             "status": "success",
             "message": "Login successful!",
             "user": {
+                "uid": uid,
                 "email": email,
                 "role": user_role,
-                "name": user_data.get('name', name)
+                "name": user_data.get('name', name),
+                "tenant_id": user_data.get('company_id') or user_data.get('college_id')
             }
         })
     else:
@@ -135,24 +139,42 @@ def google_auth():
             return jsonify({"status": "error", "message": "Invalid role specified."}), 400
 
         # Write the role-lookup doc
-        g.db.collection('user_index').document(email).set({'role': role})
+        batch = g.db.batch()
+        user_index_ref = g.db.collection('user_index').document(uid)
+        batch.set(user_index_ref, {'role': role, 'email': email})
 
         # Create user in the appropriate collection
-        collection_name = 'recruiters' if role == 'recruiter' else 'candidates'
+        if role == 'recruiter' or role == 'company':
+            collection_name = 'companies' if role == 'company' else 'recruiters'
+        else:
+            collection_name = 'colleges' if role == 'college' else 'candidates'
+            
+        profile_ref = g.db.collection(collection_name).document(uid)
         
-        g.db.collection(collection_name).document(email).set({
+        profile_data = {
+            'uid': uid,
             'email': email,
             'role': role,
             'name': name,
             'createdAt': firestore.SERVER_TIMESTAMP if hasattr(firestore, 'SERVER_TIMESTAMP') else None
-        })
+        }
+        
+        if role in ('recruiter', 'company') and tenant_id:
+            profile_data['company_id'] = tenant_id
+        elif role in ('candidate', 'college') and tenant_id:
+            profile_data['college_id'] = tenant_id
+
+        batch.set(profile_ref, profile_data)
+        batch.commit()
 
         return jsonify({
             "status": "success",
             "message": "Account created successfully!",
             "user": {
+                "uid": uid,
                 "email": email,
                 "role": role,
-                "name": name
+                "name": name,
+                "tenant_id": tenant_id
             }
         })

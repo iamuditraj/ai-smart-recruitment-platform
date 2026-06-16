@@ -91,7 +91,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function loginWithGoogle(role = null) {
+  async function loginWithGoogle(role = null, tenantId = null) {
     try {
       const { signInWithPopup } = await import('firebase/auth')
       const { auth, googleProvider } = await import('../utils/firebase')
@@ -101,7 +101,7 @@ export const useAuthStore = defineStore('auth', () => {
       
       // We import googleAuth from api here since it acts nicely alongside the others
       const { googleAuth } = await import('../utils/api')
-      const data = await googleAuth(idToken, role)
+      const data = await googleAuth(idToken, role, tenantId)
       
       user.value = data.user
       localStorage.setItem('auth_user', JSON.stringify(data.user))
