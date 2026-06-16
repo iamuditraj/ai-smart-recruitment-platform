@@ -8,12 +8,12 @@ recruiter_bp = Blueprint('recruiter', __name__)
 @handle_route_errors
 @require_db
 def get_recruiter_applications():
-    recruiter_email = request.args.get('email')
-    if not recruiter_email:
-        return jsonify({"status": "error", "message": "Recruiter email is required"}), 400
+    company_id = request.args.get('company_id')
+    if not company_id:
+        return jsonify({"status": "error", "message": "Company ID is required"}), 400
 
-    # 1. Get all job IDs belonging to this recruiter
-    jobs_docs = g.db.collection('jobs').where('recruiter_email', '==', recruiter_email).get()
+    # 1. Get all job IDs belonging to this company
+    jobs_docs = g.db.collection('jobs').where('company_id', '==', company_id).get()
     job_ids = [doc.id for doc in jobs_docs]
 
     if not job_ids:

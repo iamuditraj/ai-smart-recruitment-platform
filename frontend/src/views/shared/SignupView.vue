@@ -67,6 +67,30 @@
             />
           </div>
 
+          <div class="form-group" v-if="role === 'candidate' || role === 'college'">
+            <label class="form-label" for="signup-college">College ID</label>
+            <input
+              v-model="college_id"
+              type="text"
+              id="signup-college"
+              class="form-input"
+              placeholder="Your College ID"
+              required
+            />
+          </div>
+
+          <div class="form-group" v-if="role === 'recruiter' || role === 'company'">
+            <label class="form-label" for="signup-company">Company ID</label>
+            <input
+              v-model="company_id"
+              type="text"
+              id="signup-company"
+              class="form-input"
+              placeholder="Your Company ID"
+              required
+            />
+          </div>
+
         </AuthForm>
 
         <div class="divider">
@@ -97,6 +121,8 @@ const role = ref('candidate')
 const name = ref('')
 const email = ref('')
 const password = ref('')
+const college_id = ref('')
+const company_id = ref('')
 const isLoading = ref(false)
 const errorMessage = ref('')
 
@@ -110,16 +136,22 @@ async function handleSignup() {
   isLoading.value = true
   errorMessage.value = ''
 
-  const result = await authStore.signup({
+  const result = await authStore.registerUser({
     email: email.value,
     password: password.value,
     role: role.value,
-    name: name.value
+    name: name.value,
+    college_id: college_id.value,
+    company_id: company_id.value
   })
 
   isLoading.value = false
   if (result.success) {
-    router.push('/dashboard')
+    if (role.value === 'college') {
+      router.push('/college/dashboard')
+    } else {
+      router.push('/dashboard')
+    }
   } else {
     errorMessage.value = result.message || 'Signup failed'
   }

@@ -33,14 +33,25 @@ def validate_rounds(rounds):
     return cleaned, None
 
 
-def get_user_collection(db, email: str):
+def get_user_collection(db, uid: str):
     """
     Looks up user_index collection, returns tuple of (role, collection_name).
     Used to avoid repeating this pattern in routes.
     """
-    index_doc = db.collection('user_index').document(email).get()
+    index_doc = db.collection('user_index').document(uid).get()
     user_role = index_doc.to_dict().get('role') if index_doc.exists else None
-    collection_name = 'recruiters' if user_role == 'recruiter' else 'candidates'
+    
+    if user_role == 'recruiter':
+        collection_name = 'recruiters'
+    elif user_role == 'candidate':
+        collection_name = 'candidates'
+    elif user_role == 'college':
+        collection_name = 'colleges'
+    elif user_role == 'company':
+        collection_name = 'companies'
+    else:
+        collection_name = None
+        
     return user_role, collection_name
 
 def serialize_timestamps(doc_dict: dict) -> dict:
@@ -79,10 +90,10 @@ def build_ats_pipeline(resume_file, jd_text: str, parsed_jd: dict):
     return ats_result, llm_parsed_resume
 
 
-def get_resume_file_from_hub(db, candidate_email, resume_id):
+def get_resume_file_from_hub(db, candidate_uid, resume_id):
     """Fetch a resume from the candidate's Resume Hub and return a file-like object.
 
-    Looks up ``candidates/{candidate_email}/resumes/{resume_id}`` in Firestore,
+    Looks up ``candidates/{candidate_uid}/resumes/{resume_id}`` in Firestore,
     decodes the stored base64 data-URI back into raw bytes, and wraps them in
     a :class:`io.BytesIO` with a ``.filename`` attribute so the result is
     compatible with :func:`build_ats_pipeline`.
@@ -93,7 +104,7 @@ def get_resume_file_from_hub(db, candidate_email, resume_id):
     import base64
 
     resume_doc = (db.collection('candidates')
-                    .document(candidate_email)
+                    .document(candidate_uid)
                     .collection('resumes')
                     .document(resume_id)
                     .get())
@@ -118,9 +129,9 @@ def get_resume_file_from_hub(db, candidate_email, resume_id):
     return file_obj, None
 
 
-def save_resume_to_profile(db, email, resume_id, resume_doc, parent_extras=None):
+def save_resume_to_profile(db, uid, resume_id, resume_doc, parent_extras=None):
     """
-    Save a resume document to ``candidates/{email}/resumes/{resume_id}``.
+    Save a resume document to ``candidates/{uid}/resumes/{resume_id}``.
 
     Automatically checks if this is the candidate's first resume and marks
     it as the default.  When it *is* the default, the parent candidate
@@ -129,7 +140,7 @@ def save_resume_to_profile(db, email, resume_id, resume_doc, parent_extras=None)
 
     Returns True if the saved resume became the default.
     """
-    candidate_ref = db.collection('candidates').document(email)
+    candidate_ref = db.collection('candidates').document(uid)
 
     is_default = len(list(candidate_ref.collection('resumes').stream())) == 0
     resume_doc['isDefault'] = is_default
@@ -190,14 +201,15 @@ def enrich_app_with_candidate(db, app_data):
     and ``parsedResume`` (if not already present) from the candidate document.
     Mutates *app_data* in place and returns it.
     """
-    c_email = app_data.get('candidate_email')
-    if not c_email:
+    c_uid = app_data.get('candidate_uid')
+    if not c_uid:
         return app_data
 
-    user_doc = db.collection('candidates').document(c_email).get()
+    user_doc = db.collection('candidates').document(c_uid).get()
     if user_doc.exists:
         user_data = user_doc.to_dict()
-        app_data['candidate_name'] = user_data.get('name', c_email.split('@')[0])
+        app_data['candidate_name'] = user_data.get('name', 'Candidate')
+        app_data['candidate_email'] = user_data.get('email', '')
         if not app_data.get('parsedResume'):
             app_data['parsedResume'] = user_data.get('parsedResume')
         app_data.setdefault('resumeUrl', user_data.get('resumeUrl'))
@@ -205,7 +217,7 @@ def enrich_app_with_candidate(db, app_data):
         app_data.setdefault('experience', user_data.get('bio', ''))
     else:
         if not app_data.get('candidate_name'):
-            app_data['candidate_name'] = c_email.split('@')[0]
+            app_data['candidate_name'] = 'Candidate'
 
     return app_data
 
@@ -254,6 +266,8 @@ def advance_round(db, job_id, expected_round_index):
     for doc in apps_ref.stream():
         app = doc.to_dict()
         app['_ref'] = doc.reference
+        # Enrich to get candidate_email for email sending
+        enrich_app_with_candidate(db, app)
         if app.get('terminal_round_index') is None:
             active_apps.append(app)
 
@@ -278,34 +292,45 @@ def advance_round(db, job_id, expected_round_index):
     company = job_data.get('company', 'our company')
 
     for app in rejected:
-        c_name = app.get('candidate_name') or app.get('candidate_email', 'Candidate')
-        c_email = app.get('candidate_email')
+        c_name = app.get('candidate_name') or 'Candidate'
+        c_email = app.get('candidate_email') # Needs candidate_email populated by enrich
         
-        email_log = email_client.send_rejection_email(
-            c_email, c_name, job_title, company, rounds[current_idx]
-        )
-        
-        batch.update(app['_ref'], {
-            'terminal_round_index': current_idx,
-            'round_status': 'Reject',
-            'status': 'Rejected',
-            'communications_log': firestore.ArrayUnion([email_log])
-        })
+        if c_email:
+            email_log = email_client.send_rejection_email(
+                c_email, c_name, job_title, company, rounds[current_idx]
+            )
+            batch.update(app['_ref'], {
+                'terminal_round_index': current_idx,
+                'round_status': 'Reject',
+                'status': 'Rejected',
+                'communications_log': firestore.ArrayUnion([email_log])
+            })
+        else:
+            batch.update(app['_ref'], {
+                'terminal_round_index': current_idx,
+                'round_status': 'Reject',
+                'status': 'Rejected'
+            })
 
     for app in cleared:
-        c_name = app.get('candidate_name') or app.get('candidate_email', 'Candidate')
+        c_name = app.get('candidate_name') or 'Candidate'
         c_email = app.get('candidate_email')
         
-        if is_complete_now:
-            email_log = email_client.send_hired_email(c_email, c_name, job_title, company)
-        else:
-            email_log = email_client.send_advancement_email(c_email, c_name, job_title, company, next_round_name)
+        email_log = None
+        if c_email:
+            if is_complete_now:
+                email_log = email_client.send_hired_email(c_email, c_name, job_title, company)
+            else:
+                email_log = email_client.send_advancement_email(c_email, c_name, job_title, company, next_round_name)
             
-        batch.update(app['_ref'], {
+        update_data = {
             'round_status': 'Cleared' if is_complete_now else 'Pending',
-            'status': next_round_name,
-            'communications_log': firestore.ArrayUnion([email_log])
-        })
+            'status': next_round_name
+        }
+        if email_log:
+            update_data['communications_log'] = firestore.ArrayUnion([email_log])
+            
+        batch.update(app['_ref'], update_data)
 
     batch.update(job_ref, {
         'current_round_index': next_idx,

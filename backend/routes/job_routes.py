@@ -37,11 +37,12 @@ def handle_jobs():
     if request.method == 'POST':
         data = request.json
         title = data.get('title')
-        company = data.get('company')
-        recruiter_email = data.get('recruiter_email')
+        company_id = data.get('company_id')
+        college_id = data.get('college_id')
+        recruiter_uid = data.get('recruiter_uid')
         
-        if not all([title, company, recruiter_email]):
-            return jsonify({"status": "error", "message": "Missing required job fields: title, company, or recruiter_email"}), 400
+        if not title:
+            return jsonify({"status": "error", "message": "Missing required job field: title"}), 400
 
         # ── Pipeline rounds ───────────────────────────────────────────
         raw_rounds = data.get('rounds') or DEFAULT_ROUNDS
@@ -50,7 +51,13 @@ def handle_jobs():
             return jsonify({"status": "error", "message": rounds_err}), 400
 
         job_ref = g.db.collection('jobs').document()
-        job_data = {"id": job_ref.id, "recruiter_email": recruiter_email, "posted_at": firestore.SERVER_TIMESTAMP}
+        job_data = {
+            "id": job_ref.id, 
+            "recruiter_uid": recruiter_uid, 
+            "company_id": company_id,
+            "college_id": college_id,
+            "posted_at": firestore.SERVER_TIMESTAMP
+        }
         for field in _JOB_EDITABLE_FIELDS:
             job_data[field] = data.get(field, _JOB_DEFAULTS.get(field))
 
@@ -63,20 +70,23 @@ def handle_jobs():
         return jsonify({"status": "success", "message": "Job posted successfully!", "job": response_data})
     
     else: # GET
-        recruiter_email = request.args.get('recruiter_email')
-        if recruiter_email:
-            jobs_docs = g.db.collection('jobs').where('recruiter_email', '==', recruiter_email).stream()
-        else:
-            jobs_docs = g.db.collection('jobs').order_by('posted_at', direction=firestore.Query.DESCENDING).stream()
+        company_id = request.args.get('company_id')
+        college_id = request.args.get('college_id')
+        
+        query = g.db.collection('jobs')
+        
+        if company_id:
+            query = query.where('company_id', '==', company_id)
+        if college_id:
+            query = query.where('college_id', '==', college_id)
+            
+        jobs_docs = query.order_by('posted_at', direction=firestore.Query.DESCENDING).stream()
             
         jobs = []
         for doc in jobs_docs:
             job = doc.to_dict()
             job = serialize_timestamps(job)
             jobs.append(job)
-            
-        if recruiter_email:
-            jobs.sort(key=lambda x: x.get('posted_at') or '', reverse=True)
             
         return jsonify({"status": "success", "jobs": jobs})
 
@@ -126,16 +136,16 @@ def preview_score():
     job_id = request.form.get('job_id')
     resume_file = request.files.get('resume')
     resume_id = request.form.get('resume_id')
-    candidate_email = request.form.get('candidate_email')
+    candidate_uid = request.form.get('candidate_uid')
     
     if not job_id:
         return jsonify({"status": "error", "message": "Missing job_id"}), 400
 
     # If no file uploaded, try fetching from Resume Hub
     if not resume_file:
-        if not resume_id or not candidate_email:
-            return jsonify({"status": "error", "message": "Provide a resume file or resume_id + candidate_email"}), 400
-        resume_file, err = get_resume_file_from_hub(g.db, candidate_email, resume_id)
+        if not resume_id or not candidate_uid:
+            return jsonify({"status": "error", "message": "Provide a resume file or resume_id + candidate_uid"}), 400
+        resume_file, err = get_resume_file_from_hub(g.db, candidate_uid, resume_id)
         if err:
             return jsonify({"status": "error", "message": err}), 400
 
@@ -157,22 +167,22 @@ def preview_score():
 @require_db
 def apply_for_job():
     job_id = request.form.get('job_id')
-    candidate_email = request.form.get('candidate_email')
+    candidate_uid = request.form.get('candidate_uid')
     resume_file = request.files.get('resume')
     resume_id = request.form.get('resume_id')
     
-    if not all([job_id, candidate_email]):
-        return jsonify({"status": "error", "message": "Missing job_id or candidate_email"}), 400
+    if not all([job_id, candidate_uid]):
+        return jsonify({"status": "error", "message": "Missing job_id or candidate_uid"}), 400
 
     # If no file uploaded, try fetching from Resume Hub
     if not resume_file:
         if not resume_id:
             return jsonify({"status": "error", "message": "Provide a resume file or resume_id"}), 400
-        resume_file, err = get_resume_file_from_hub(g.db, candidate_email, resume_id)
+        resume_file, err = get_resume_file_from_hub(g.db, candidate_uid, resume_id)
         if err:
             return jsonify({"status": "error", "message": err}), 400
         
-    existing = g.db.collection('jobs').document(job_id).collection('applications').where('candidate_email', '==', candidate_email).get()
+    existing = g.db.collection('jobs').document(job_id).collection('applications').where('candidate_uid', '==', candidate_uid).get()
     if len(existing) > 0:
         return jsonify({"status": "error", "message": "You have already applied for this job"}), 400
 
@@ -208,7 +218,7 @@ def apply_for_job():
     app_data = {
         "id": app_ref.id,
         "job_id": job_id,
-        "candidate_email": candidate_email,
+        "candidate_uid": candidate_uid,
         "status": "Applied",
         "applied_at": firestore.SERVER_TIMESTAMP,
         "ats_score": ats_result.get("score", 0),
@@ -226,7 +236,7 @@ def apply_for_job():
     app_ref.set(app_data)
 
     try:
-        g.db.collection('candidates').document(candidate_email).update({
+        g.db.collection('candidates').document(candidate_uid).update({
             "parsedResume": llm_parsed_resume,
             "resumeName": resume_file.filename,
             "updatedAt": firestore.SERVER_TIMESTAMP

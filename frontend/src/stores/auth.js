@@ -32,15 +32,54 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function signup(userData) {
+  async function registerUser(formData) {
+    let firebaseUser = null;
     try {
-      const data = await signupUser(userData)
-      user.value = data.user
-      localStorage.setItem('auth_user', JSON.stringify(data.user))
-      localStorage.setItem('user_role', data.user.role)
-      return { success: true }
+      const { auth } = await import('../utils/firebase');
+      const { createUserWithEmailAndPassword, deleteUser } = await import('firebase/auth');
+      const { signupUser } = await import('../utils/api');
+
+      // Step 1: Create the identity in Firebase Auth
+      const userCredential = await createUserWithEmailAndPassword(
+        auth, 
+        formData.email, 
+        formData.password
+      );
+      firebaseUser = userCredential.user;
+
+      // Step 2: Route the correct tenant_id based on the selected role
+      let assignedTenantId = null;
+      if (formData.role === 'recruiter' || formData.role === 'company') {
+        assignedTenantId = formData.company_id; 
+      } else if (formData.role === 'candidate' || formData.role === 'college') {
+        assignedTenantId = formData.college_id;
+      }
+
+      // Step 3: Construct the payload for the Flask backend
+      const backendPayload = {
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        name: formData.name,
+        role: formData.role,
+        tenant_id: assignedTenantId
+      };
+
+      // Step 4: Send to the new atomic backend endpoint
+      const data = await signupUser(backendPayload);
+
+      // Step 5: Update local Pinia state upon backend success
+      user.value = data.user;
+      localStorage.setItem('auth_user', JSON.stringify(data.user));
+      localStorage.setItem('user_role', data.user.role);
+      
+      return { success: true };
     } catch (error) {
-      return handleApiError('Signup', error)
+      // ROLLBACK: If backend fails, destroy the Firebase Auth identity
+      if (firebaseUser) {
+        const { deleteUser } = await import('firebase/auth');
+        await deleteUser(firebaseUser).catch(console.error);
+      }
+      return handleApiError('Signup', error);
     }
   }
 
@@ -117,7 +156,7 @@ export const useAuthStore = defineStore('auth', () => {
     isRecruiter,
     isCandidate,
     login,
-    signup,
+    registerUser,
     loginWithGoogle,
     updateProfile,
     uploadResume: resumeActions.uploadResume,

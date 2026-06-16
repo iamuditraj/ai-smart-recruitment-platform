@@ -12,44 +12,77 @@ auth_bp = Blueprint('auth', __name__)
 @require_db
 def signup():
     data = request.json
+    uid = data.get('uid')
     email = data.get('email')
-    password = data.get('password')
     role = data.get('role')
     name = data.get('name', '')
+    tenant_id = data.get('tenant_id')
 
-    if not email or not password or not role:
-        return jsonify({"status": "error", "message": "Missing email, password or role"}), 400
+    if not uid or not email or not role:
+        if uid:
+            try:
+                firebase_auth.delete_user(uid)
+            except Exception as e:
+                print(f"Auth rollback failed: {e}")
+        return jsonify({"status": "error", "message": "Missing uid, email or role"}), 400
 
-    # Check if user exists in the user_index collection
-    index_doc = g.db.collection('user_index').document(email).get()
+    try:
+        batch = g.db.batch()
 
-    if index_doc.exists:
-        return jsonify({"status": "error", "message": "User already exists"}), 400
+        user_index_ref = g.db.collection('user_index').document(uid)
+        
+        if role == 'recruiter':
+            collection_name = 'recruiters'
+        elif role == 'candidate':
+            collection_name = 'candidates'
+        elif role == 'college':
+            collection_name = 'colleges'
+        elif role == 'company':
+            collection_name = 'companies'
+        else:
+            raise ValueError("Invalid role")
+            
+        profile_ref = g.db.collection(collection_name).document(uid)
 
-    # Write the role-lookup doc
-    g.db.collection('user_index').document(email).set({'role': role})
+        batch.set(user_index_ref, {'role': role, 'email': email})
 
-    # Create user in the appropriate collection
-    hashed_password = generate_password_hash(password)
-    collection_name = 'recruiters' if role == 'recruiter' else 'candidates'
-    
-    g.db.collection(collection_name).document(email).set({
-        'email': email,
-        'password': hashed_password,
-        'role': role,
-        'name': name,
-        'createdAt': firestore.SERVER_TIMESTAMP if hasattr(firestore, 'SERVER_TIMESTAMP') else None
-    })
-
-    return jsonify({
-        "status": "success",
-        "message": "Account created successfully!",
-        "user": {
-            "email": email,
-            "role": role,
-            "name": name
+        profile_data = {
+            'uid': uid,
+            'email': email,
+            'role': role,
+            'name': name,
+            'createdAt': firestore.SERVER_TIMESTAMP if hasattr(firestore, 'SERVER_TIMESTAMP') else None
         }
-    })
+        
+        if role in ('recruiter', 'company') and tenant_id:
+            profile_data['company_id'] = tenant_id
+        elif role in ('candidate', 'college') and tenant_id:
+            profile_data['college_id'] = tenant_id
+
+        batch.set(profile_ref, profile_data)
+        
+        batch.commit()
+
+        return jsonify({
+            "status": "success",
+            "message": "Account created successfully!",
+            "user": {
+                "uid": uid,
+                "email": email,
+                "role": role,
+                "name": name,
+                "tenant_id": tenant_id
+            }
+        })
+    except Exception as e:
+        # Rollback Firebase Auth user
+        try:
+            firebase_auth.delete_user(uid)
+            print(f"Rolled back Firebase Auth user: {uid}")
+        except Exception as rollback_e:
+            print(f"Rollback failed for {uid}: {rollback_e}")
+            
+        return jsonify({"status": "error", "message": f"Signup failed: {str(e)}"}), 500
 
 @auth_bp.route('/api/login', methods=['POST'])
 @handle_route_errors

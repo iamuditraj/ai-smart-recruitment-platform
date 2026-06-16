@@ -3,31 +3,43 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Fast login lookup — readable by anyone, never written from client
-    match /user_index/{email} {
-      allow read: if true;
-      allow write: if false;
+    // Profiles and mappings: accessible only by the owner
+    match /user_index/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false; // Backend only
     }
 
-    // Candidate profiles and their resume subcollection
-    match /candidates/{email} {
-      allow read, write: if true;
+    match /candidates/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false; // Backend only
+      
       match /resumes/{resumeId} {
-        allow read, write: if true;
+        allow read: if request.auth != null && request.auth.uid == uid;
+        allow write: if false; // Backend only
       }
     }
 
-    // Recruiter profiles
-    match /recruiters/{email} {
-      allow read, write: if true;
+    match /recruiters/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false; // Backend only
     }
 
-    // Jobs and their applications subcollection
+    match /colleges/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false; // Backend only
+    }
+
+    match /companies/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false; // Backend only
+    }
+
+    // Backend-managed collections: completely blocked from direct client access
     match /jobs/{jobId} {
-      allow read: if true;
-      allow write: if true;
+      allow read, write: if false;
+      
       match /applications/{appId} {
-        allow read, write: if true;
+        allow read, write: if false;
       }
     }
   }

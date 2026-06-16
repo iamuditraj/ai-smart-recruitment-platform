@@ -9,9 +9,9 @@ candidate_bp = Blueprint('candidate', __name__)
 @require_db
 def get_candidate_applications():
     """Return every application a candidate has submitted, enriched with job info."""
-    candidate_email = request.args.get('email')
-    if not candidate_email:
-        return jsonify({"status": "error", "message": "Candidate email is required"}), 400
+    candidate_uid = request.args.get('uid')
+    if not candidate_uid:
+        return jsonify({"status": "error", "message": "Candidate uid is required"}), 400
 
     # We need to scan all jobs for applications by this candidate.
     # For MVP scale this is acceptable; at scale use a top-level applications collection.
@@ -22,7 +22,7 @@ def get_candidate_applications():
         job_data = job_doc.to_dict()
         apps = (g.db.collection('jobs').document(job_doc.id)
                   .collection('applications')
-                  .where('candidate_email', '==', candidate_email)
+                  .where('candidate_uid', '==', candidate_uid)
                   .stream())
 
         for app_doc in apps:
@@ -36,7 +36,7 @@ def get_candidate_applications():
             app_data['job_current_round_index'] = job_data.get('current_round_index', 0)
 
             if app_data.get('status') in ['Shortlisted', 'Hired']:
-                app_data['recruiter_email'] = job_data.get('recruiter_email', '')
+                app_data['recruiter_uid'] = job_data.get('recruiter_uid', '')
 
             app_data = serialize_timestamps(app_data)
             all_apps.append(app_data)
@@ -51,9 +51,9 @@ def get_candidate_applications():
 @require_db
 def get_candidate_applied_jobs():
     """Return the set of job IDs a candidate has already applied to (for quick UI checks)."""
-    candidate_email = request.args.get('email')
-    if not candidate_email:
-        return jsonify({"status": "error", "message": "Candidate email is required"}), 400
+    candidate_uid = request.args.get('uid')
+    if not candidate_uid:
+        return jsonify({"status": "error", "message": "Candidate uid is required"}), 400
 
     jobs_stream = g.db.collection('jobs').stream()
     applied_job_ids = []
@@ -61,7 +61,7 @@ def get_candidate_applied_jobs():
     for job_doc in jobs_stream:
         apps = (g.db.collection('jobs').document(job_doc.id)
                   .collection('applications')
-                  .where('candidate_email', '==', candidate_email)
+                  .where('candidate_uid', '==', candidate_uid)
                   .limit(1)
                   .stream())
         if any(True for _ in apps):
