@@ -24,12 +24,23 @@ service cloud.firestore {
     }
 
     match /companies/{uid} {
-      allow read: if isAuthenticated();
+      function isManagingCollege() {
+        return request.auth.token.role == 'college' && request.auth.token.tenant_id == resource.data.college_id;
+      }
+
+      allow read: if isOwner(uid) || (isAuthenticated() && isManagingCollege());
       allow write: if false; // Backend only
     }
 
     match /recruiters/{uid} {
-      allow read: if isAuthenticated();
+      function isManagingCollege() {
+        return request.auth.token.role == 'college' && request.auth.token.tenant_id == resource.data.college_id;
+      }
+      function isParentCompany() {
+        return request.auth.token.role == 'company' && request.auth.token.tenant_id == resource.data.company_id;
+      }
+
+      allow read: if isOwner(uid) || (isAuthenticated() && (isParentCompany() || isManagingCollege()));
       allow write: if false; // Backend only
     }
 
@@ -37,17 +48,18 @@ service cloud.firestore {
     match /candidates/{uid} {
       function isCollegeForCandidate() {
         return request.auth.token.role == 'college' && 
-               request.auth.token.tenant_id in resource.data.college_ids;
+               request.auth.token.tenant_id == resource.data.college_id;
       }
 
       allow read: if isOwner(uid) || (isAuthenticated() && isCollegeForCandidate());
       allow write: if isOwner(uid);
+      allow update: if isAuthenticated() && isCollegeForCandidate() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['verification_status']);
 
       // Resumes subcollection inherits same logic
       match /resumes/{resumeId} {
         function isParentCollege() {
           return request.auth.token.role == 'college' &&
-                 request.auth.token.tenant_id in get(/databases/$(database)/documents/candidates/$(uid)).data.college_ids;
+                 request.auth.token.tenant_id == get(/databases/$(database)/documents/candidates/$(uid)).data.college_id;
         }
         
         allow read: if isOwner(uid) || (isAuthenticated() && isParentCollege());

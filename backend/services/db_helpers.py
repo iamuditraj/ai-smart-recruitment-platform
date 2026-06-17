@@ -372,8 +372,8 @@ def verify_recruiter_company(db, uid, company_id):
     return doc.to_dict().get('company_id') == company_id
 
 def verify_candidate_college(db, candidate_uid, college_id):
-    """Checks if the candidate's college_ids array contains the target college_id."""
+    """Checks if the candidate's college_id matches the target college_id."""
     doc = db.collection('candidates').document(candidate_uid).get()
     if not doc.exists:
         return False
-    return college_id in doc.to_dict().get('college_ids', [])
+    return doc.to_dict().get('college_id') == college_id
