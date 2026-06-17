@@ -33,25 +33,28 @@ def validate_rounds(rounds):
     return cleaned, None
 
 
+# ── Role → collection mapping ─────────────────────────────────────────────
+_ROLE_COLLECTION_MAP = {
+    'candidate': 'candidates',
+    'recruiter': 'recruiters',
+    'college':   'colleges',
+    'company':   'companies',
+}
+
+
 def get_user_collection(db, uid: str):
-    """
-    Looks up user_index collection, returns tuple of (role, collection_name).
-    Used to avoid repeating this pattern in routes.
+    """Look up a user's role and Firestore collection by their **uid**.
+
+    Reads ``user_index/{uid}`` and maps the stored ``role`` field to the
+    corresponding top-level collection name.
+
+    Returns ``(role, collection_name)``.
+    If the document doesn't exist or has an unrecognised role, both values
+    are ``None``.
     """
     index_doc = db.collection('user_index').document(uid).get()
     user_role = index_doc.to_dict().get('role') if index_doc.exists else None
-    
-    if user_role == 'recruiter':
-        collection_name = 'recruiters'
-    elif user_role == 'candidate':
-        collection_name = 'candidates'
-    elif user_role == 'college':
-        collection_name = 'colleges'
-    elif user_role == 'company':
-        collection_name = 'companies'
-    else:
-        collection_name = None
-        
+    collection_name = _ROLE_COLLECTION_MAP.get(user_role)
     return user_role, collection_name
 
 def serialize_timestamps(doc_dict: dict) -> dict:
@@ -197,19 +200,21 @@ def get_job_with_parsed_jd(db, job_id):
 def enrich_app_with_candidate(db, app_data):
     """Enrich an application dict with data from the candidate's profile.
 
-    Adds ``candidate_name``, ``resumeUrl``, ``resumeName``, ``experience``,
-    and ``parsedResume`` (if not already present) from the candidate document.
+    Looks up the candidate via ``candidate_uid`` (Firebase Auth UID).
+    Adds ``candidate_name``, ``candidate_uid``, ``resumeUrl``,
+    ``resumeName``, ``experience``, and ``parsedResume`` (if not already
+    present) from the candidate document.
     Mutates *app_data* in place and returns it.
     """
-    c_uid = app_data.get('candidate_uid')
-    if not c_uid:
+    candidate_uid = app_data.get('candidate_uid')
+    if not candidate_uid:
         return app_data
 
-    user_doc = db.collection('candidates').document(c_uid).get()
+    user_doc = db.collection('candidates').document(candidate_uid).get()
     if user_doc.exists:
         user_data = user_doc.to_dict()
         app_data['candidate_name'] = user_data.get('name', 'Candidate')
-        app_data['candidate_email'] = user_data.get('email', '')
+        app_data['candidate_uid'] = candidate_uid
         if not app_data.get('parsedResume'):
             app_data['parsedResume'] = user_data.get('parsedResume')
         app_data.setdefault('resumeUrl', user_data.get('resumeUrl'))
@@ -266,7 +271,7 @@ def advance_round(db, job_id, expected_round_index):
     for doc in apps_ref.stream():
         app = doc.to_dict()
         app['_ref'] = doc.reference
-        # Enrich to get candidate_email for email sending
+        # Enrich to get candidate_uid and name for downstream processing
         enrich_app_with_candidate(db, app)
         if app.get('terminal_round_index') is None:
             active_apps.append(app)
@@ -293,7 +298,13 @@ def advance_round(db, job_id, expected_round_index):
 
     for app in rejected:
         c_name = app.get('candidate_name') or 'Candidate'
-        c_email = app.get('candidate_email') # Needs candidate_email populated by enrich
+        candidate_uid = app.get('candidate_uid')
+        # Look up candidate email from their profile for notification
+        c_email = None
+        if candidate_uid:
+            cand_doc = db.collection('candidates').document(candidate_uid).get()
+            if cand_doc.exists:
+                c_email = cand_doc.to_dict().get('email')
         
         if c_email:
             email_log = email_client.send_rejection_email(
@@ -314,7 +325,13 @@ def advance_round(db, job_id, expected_round_index):
 
     for app in cleared:
         c_name = app.get('candidate_name') or 'Candidate'
-        c_email = app.get('candidate_email')
+        candidate_uid = app.get('candidate_uid')
+        # Look up candidate email from their profile for notification
+        c_email = None
+        if candidate_uid:
+            cand_doc = db.collection('candidates').document(candidate_uid).get()
+            if cand_doc.exists:
+                c_email = cand_doc.to_dict().get('email')
         
         email_log = None
         if c_email:

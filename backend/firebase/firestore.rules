@@ -3,76 +3,86 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Profiles and mappings: accessible only by the owner
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    // 1. user_index, colleges, companies, recruiters
     match /user_index/{uid} {
-      allow read: if request.auth != null && request.auth.uid == uid;
-      allow write: if false; // Backend only
-    }
-
-    match /candidates/{uid} {
-      function isCollegeAdmin() {
-        return request.auth.token.role == 'college' &&
-               request.auth.token.tenant_id in resource.data.college_ids;
-      }
-      function isRecruiter() {
-        return request.auth.token.role == 'recruiter' &&
-               request.auth.token.tenant_id in resource.data.recruiter_ids;
-      }
-
-      allow read: if request.auth != null && (
-        request.auth.uid == uid || isCollegeAdmin() || isRecruiter()
-      );
-      allow write: if false; // Backend only
-      
-      match /resumes/{resumeId} {
-        function isParentCollegeAdmin() {
-          return request.auth.token.role == 'college' &&
-                 request.auth.token.tenant_id in get(/databases/$(database)/documents/candidates/$(uid)).data.college_ids;
-        }
-        function isParentRecruiter() {
-          return request.auth.token.role == 'recruiter' &&
-                 request.auth.token.tenant_id in get(/databases/$(database)/documents/candidates/$(uid)).data.recruiter_ids;
-        }
-
-        allow read: if request.auth != null && (
-          request.auth.uid == uid || isParentCollegeAdmin() || isParentRecruiter()
-        );
-        allow write: if false; // Backend only
-      }
-    }
-
-    match /recruiters/{uid} {
-      allow read: if request.auth != null && request.auth.uid == uid;
+      allow read: if isAuthenticated();
       allow write: if false; // Backend only
     }
 
     match /colleges/{uid} {
-      allow read: if request.auth != null && request.auth.uid == uid;
+      allow read: if isAuthenticated();
       allow write: if false; // Backend only
     }
 
     match /companies/{uid} {
-      allow read: if request.auth != null && request.auth.uid == uid;
+      allow read: if isAuthenticated();
       allow write: if false; // Backend only
     }
 
-    // Backend-managed collections
+    match /recruiters/{uid} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Backend only
+    }
+
+    // 2. candidates
+    match /candidates/{uid} {
+      function isCollegeForCandidate() {
+        return request.auth.token.role == 'college' && 
+               request.auth.token.tenant_id in resource.data.college_ids;
+      }
+
+      allow read: if isOwner(uid) || (isAuthenticated() && isCollegeForCandidate());
+      allow write: if isOwner(uid);
+
+      // Resumes subcollection inherits same logic
+      match /resumes/{resumeId} {
+        function isParentCollege() {
+          return request.auth.token.role == 'college' &&
+                 request.auth.token.tenant_id in get(/databases/$(database)/documents/candidates/$(uid)).data.college_ids;
+        }
+        
+        allow read: if isOwner(uid) || (isAuthenticated() && isParentCollege());
+        allow write: if isOwner(uid);
+      }
+    }
+
+    // 3. jobs
     match /jobs/{jobId} {
       function isActiveJob() {
         return resource.data.status == 'active';
       }
-      function isJobOwner() {
-        return request.auth.token.company_id == resource.data.company_id || 
-               request.auth.token.college_id == resource.data.college_id;
+      
+      function isJobTenant() {
+        return request.auth.token.tenant_id == resource.data.college_id || 
+               request.auth.token.tenant_id == resource.data.company_id;
       }
 
-      allow read: if request.auth != null && (
-        isActiveJob() || isJobOwner()
-      );
+      allow read: if isAuthenticated() && (isActiveJob() || isJobTenant());
       allow write: if false; // Backend only
-      
+
+      // 4. applications (inside jobs)
       match /applications/{appId} {
-        allow read, write: if false;
+        function isAppOwner() {
+          return request.auth.uid == resource.data.candidate_uid;
+        }
+        
+        function isParentJobTenant() {
+          let job = get(/databases/$(database)/documents/jobs/$(jobId)).data;
+          return request.auth.token.tenant_id == job.college_id || 
+                 request.auth.token.tenant_id == job.company_id;
+        }
+
+        allow read: if isAuthenticated() && (isAppOwner() || isParentJobTenant());
+        allow write: if false; // Backend only
       }
     }
   }
