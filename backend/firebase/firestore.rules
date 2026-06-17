@@ -10,11 +10,33 @@ service cloud.firestore {
     }
 
     match /candidates/{uid} {
-      allow read: if request.auth != null && request.auth.uid == uid;
+      function isCollegeAdmin() {
+        return request.auth.token.role == 'college' &&
+               request.auth.token.tenant_id in resource.data.college_ids;
+      }
+      function isRecruiter() {
+        return request.auth.token.role == 'recruiter' &&
+               request.auth.token.tenant_id in resource.data.recruiter_ids;
+      }
+
+      allow read: if request.auth != null && (
+        request.auth.uid == uid || isCollegeAdmin() || isRecruiter()
+      );
       allow write: if false; // Backend only
       
       match /resumes/{resumeId} {
-        allow read: if request.auth != null && request.auth.uid == uid;
+        function isParentCollegeAdmin() {
+          return request.auth.token.role == 'college' &&
+                 request.auth.token.tenant_id in get(/databases/$(database)/documents/candidates/$(uid)).data.college_ids;
+        }
+        function isParentRecruiter() {
+          return request.auth.token.role == 'recruiter' &&
+                 request.auth.token.tenant_id in get(/databases/$(database)/documents/candidates/$(uid)).data.recruiter_ids;
+        }
+
+        allow read: if request.auth != null && (
+          request.auth.uid == uid || isParentCollegeAdmin() || isParentRecruiter()
+        );
         allow write: if false; // Backend only
       }
     }
@@ -34,9 +56,20 @@ service cloud.firestore {
       allow write: if false; // Backend only
     }
 
-    // Backend-managed collections: completely blocked from direct client access
+    // Backend-managed collections
     match /jobs/{jobId} {
-      allow read, write: if false;
+      function isActiveJob() {
+        return resource.data.status == 'active';
+      }
+      function isJobOwner() {
+        return request.auth.token.company_id == resource.data.company_id || 
+               request.auth.token.college_id == resource.data.college_id;
+      }
+
+      allow read: if request.auth != null && (
+        isActiveJob() || isJobOwner()
+      );
+      allow write: if false; // Backend only
       
       match /applications/{appId} {
         allow read, write: if false;

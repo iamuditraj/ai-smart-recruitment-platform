@@ -48,6 +48,13 @@
   // ]
   "indexes": [
     {
+      "collectionGroup": "candidates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "college_ids", "arrayConfig": "CONTAINS" }
+      ]
+    },
+    {
       "collectionGroup": "jobs",
       "queryScope": "COLLECTION",
       "fields": [

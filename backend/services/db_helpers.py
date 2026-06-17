@@ -345,3 +345,18 @@ def advance_round(db, job_id, expected_round_index):
         'new_round_name': next_round_name,
         'is_pipeline_complete': is_complete_now,
     }, None
+
+
+def verify_recruiter_company(db, uid, company_id):
+    """Checks if the recruiter's document contains the matching company_id."""
+    doc = db.collection('recruiters').document(uid).get()
+    if not doc.exists:
+        return False
+    return doc.to_dict().get('company_id') == company_id
+
+def verify_candidate_college(db, candidate_uid, college_id):
+    """Checks if the candidate's college_ids array contains the target college_id."""
+    doc = db.collection('candidates').document(candidate_uid).get()
+    if not doc.exists:
+        return False
+    return college_id in doc.to_dict().get('college_ids', [])
