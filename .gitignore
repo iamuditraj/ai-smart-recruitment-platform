@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 venv/
+.venv/
+ml_model/.venv/
+ml_model/datasets/
 .env
 
 # Firebase

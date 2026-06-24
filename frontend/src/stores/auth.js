@@ -5,7 +5,11 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(JSON.parse(localStorage.getItem('auth_user') || 'null'))
-  const role = ref(localStorage.getItem('user_role') || null)
+  const resumes = ref([])
+
+  // Derive role directly from user object so it is always in sync.
+  // Falls back to localStorage so the sidebar renders correctly on first load.
+  const role = computed(() => user.value?.role || localStorage.getItem('user_role') || null)
 
   const isAuthenticated = computed(() => !!user.value)
   const isRecruiter = computed(() => role.value === 'recruiter')
@@ -22,7 +26,6 @@ export const useAuthStore = defineStore('auth', () => {
 
       if (data.status === 'success') {
         user.value = data.user
-        role.value = data.user.role
         localStorage.setItem('auth_user', JSON.stringify(data.user))
         localStorage.setItem('user_role', data.user.role)
         return { success: true }
@@ -47,7 +50,6 @@ export const useAuthStore = defineStore('auth', () => {
       if (data.status === 'success') {
         // Auto login after signup
         user.value = data.user
-        role.value = data.user.role
         localStorage.setItem('auth_user', JSON.stringify(data.user))
         localStorage.setItem('user_role', data.user.role)
         return { success: true }
@@ -82,6 +84,19 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function fetchResumes() {
+    if (!user.value?.email) return
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/profile/resumes?email=${user.value.email}`)
+      const data = await response.json()
+      if (data.status === 'success') {
+        resumes.value = data.resumes
+      }
+    } catch (error) {
+      console.error('fetchResumes error:', error)
+    }
+  }
+
   async function refreshUser() {
     if (!user.value?.email) return
     try {
@@ -90,10 +105,15 @@ export const useAuthStore = defineStore('auth', () => {
       if (data.status === 'success') {
         user.value = data.user
         localStorage.setItem('auth_user', JSON.stringify(data.user))
+        // Keep user_role in sync so role computed stays correct even before vue reactivity settles
+        if (data.user.role) {
+          localStorage.setItem('user_role', data.user.role)
+        }
       }
     } catch (error) {
       console.error('Refresh user error:', error)
     }
+    await fetchResumes()
   }
 
   async function uploadResume(file) {
@@ -113,6 +133,7 @@ export const useAuthStore = defineStore('auth', () => {
       if (data.status === 'success') {
         // Refresh user data to get the new resume URL
         await refreshUser()
+        await fetchResumes()
         return { success: true, url: data.resumeUrl, name: data.resumeName }
       } else {
         return { success: false, message: data.message }
@@ -123,9 +144,33 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function setDefaultResume(resume_id) {
+    if (!user.value?.email) return { success: false, message: 'Not logged in' }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/profile/set-default-resume`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: user.value.email, resume_id })
+      })
+      const data = await response.json()
+
+      if (data.status === 'success') {
+        // Refresh user data to get the new default statuses
+        await refreshUser()
+        await fetchResumes()
+        return { success: true }
+      } else {
+        return { success: false, message: data.message }
+      }
+    } catch (error) {
+      console.error('Set default resume error:', error)
+      return { success: false, message: 'Server connection failed' }
+    }
+  }
+
   function logout() {
     user.value = null
-    role.value = null
     localStorage.removeItem('auth_user')
     localStorage.removeItem('user_role')
   }
@@ -133,6 +178,7 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     user,
     role,
+    resumes,
     isAuthenticated,
     isRecruiter,
     isCandidate,
@@ -140,7 +186,9 @@ export const useAuthStore = defineStore('auth', () => {
     signup,
     updateProfile,
     uploadResume,
+    setDefaultResume,
     refreshUser,
+    fetchResumes,
     logout
   }
 })

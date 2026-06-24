@@ -1,13 +1,14 @@
-from flask import Blueprint, jsonify, request
-from services.firebase_service import get_db
-from services.ai_service import get_model
-from services.parser_service import extract_text
-from firebase_admin import firestore
-from werkzeug.security import generate_password_hash, check_password_hash
+from flask import Blueprint, jsonify, request  # pyre-ignore[21]
+from services.firebase_service import get_db  # pyre-ignore[21]
+from services.ai_service import get_model  # pyre-ignore[21]
+from services.parser_service import extract_text  # pyre-ignore[21]
+from firebase_admin import firestore  # pyre-ignore[21]
+from werkzeug.security import generate_password_hash, check_password_hash  # pyre-ignore[21]
 import io
 import json
 import re
 import datetime
+from services.ats.scorer import score_resume  # pyre-ignore[21]
 
 api_bp = Blueprint('api', __name__)
 
@@ -49,16 +50,20 @@ def signup():
         if not db:
             return jsonify({"status": "error", "message": "Database not initialized"}), 500
 
-        # Check if user exists
-        user_ref = db.collection('users').document(email)
-        user_doc = user_ref.get()
+        # Check if user exists in the user_index collection
+        index_doc = db.collection('user_index').document(email).get()
 
-        if user_doc.exists:
+        if index_doc.exists:
             return jsonify({"status": "error", "message": "User already exists"}), 400
 
-        # Create user
+        # Write the role-lookup doc
+        db.collection('user_index').document(email).set({'role': role})
+
+        # Create user in the appropriate collection
         hashed_password = generate_password_hash(password)
-        db.collection('users').document(email).set({
+        collection_name = 'recruiters' if role == 'recruiter' else 'candidates'
+        
+        db.collection(collection_name).document(email).set({
             'email': email,
             'password': hashed_password,
             'role': role,
@@ -93,9 +98,17 @@ def login():
         if not db:
             return jsonify({"status": "error", "message": "Database not initialized"}), 500
 
-        # Get user
-        user_ref = db.collection('users').document(email)
-        user_doc = user_ref.get()
+        # Check user_index to get role
+        index_doc = db.collection('user_index').document(email).get()
+
+        if not index_doc.exists:
+            return jsonify({"status": "error", "message": "Invalid email or password"}), 401
+
+        user_role = index_doc.to_dict().get('role')
+        collection_name = 'recruiters' if user_role == 'recruiter' else 'candidates'
+        
+        # Get user from correct collection
+        user_doc = db.collection(collection_name).document(email).get()
 
         if not user_doc.exists:
             return jsonify({"status": "error", "message": "Invalid email or password"}), 401
@@ -147,90 +160,100 @@ def save_resume():
     try:
         db = get_db()
         if not db:
-             return jsonify({"status": "error", "message": "Firebase not initialized"}), 500
-             
+            return jsonify({"status": "error", "message": "Firebase not initialized"}), 500
+            
         data = request.json
         resume_id = data.get('metadata', {}).get('resume_id')
         
         if not resume_id:
             return jsonify({"status": "error", "message": "No resume_id provided"}), 400
             
-        # Save to 'resumes' collection
-        db.collection('resumes').document(resume_id).set(data)
+        email = data.get('profile', {}).get('contact', {}).get('email')
+        if email:
+            candidate_ref = db.collection('candidates').document(email)
+            doc_snap = candidate_ref.get()
+            if doc_snap.exists:
+                is_default = len(list(candidate_ref.collection('resumes').stream())) == 0
+                
+                new_resume = {
+                    'id': resume_id,
+                    'resume_id': resume_id,
+                    'type': 'generated',
+                    'resumeName': f"Generated Resume - {data.get('profile', {}).get('job_title', 'Role')}",
+                    'parsedResume': data,
+                    'isDefault': is_default,
+                    'uploadedAt': datetime.datetime.utcnow().isoformat()
+                }
+                
+                candidate_ref.collection('resumes').document(resume_id).set(new_resume)
+                
+                if is_default:
+                    update_data = {
+                        'defaultResumeId': resume_id,
+                        'updatedAt': firestore.SERVER_TIMESTAMP
+                    }
+                    candidate_ref.update(update_data)
         
         return jsonify({
             "status": "success",
             "message": f"Resume {resume_id} saved successfully to Firestore!"
         })
     except Exception as e:
+        print(f"Error in save_resume: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @api_bp.route('/api/analyze', methods=['POST'])
 def analyze_resumes():
     try:
-        db = get_db() # Added to get Firestore access if needed
-        model = get_model()
-        if not model:
-            return jsonify({"status": "error", "message": "AI model not initialized"}), 500
+        db = get_db()
 
-        # 1. Get Job Description and Resumes
-        job_description = request.form.get('jobDescription', 'No JD provided')
+        job_description = request.form.get('jobDescription', '')
         resumes = request.files.getlist('resumes')
 
         if not resumes:
             return jsonify({"status": "error", "message": "No resumes uploaded"}), 400
 
+        if not job_description.strip():
+            return jsonify({"status": "error", "message": "Job description is required for ATS scoring"}), 400
+
         parsed_results = []
-        
+
         for file in resumes:
-            # 2. Extract Text from file
-            # Read into memory first to avoid file-system issues
             file_stream = io.BytesIO(file.read())
             extracted_text = extract_text(file_stream, file.filename)
-            
-            # 3. Prompt Gemini for matching
-            prompt = f"""
-            Task: Compare the following resume text against the Job Description (JD).
-            
-            JD: {job_description}
-            
-            Resume Text: {extracted_text}
-            
-            Respond STRICTLY with a JSON object containing:
-            - name: The candidate's name (found in resume, if not found use filename: {file.filename})
-            - score: A match percentage (0-100) based on JD requirements
-            - status: One of "Shortlist" (score >= 80), "Review" (60-79), or "Reject" (<60)
-            - badgeClass: One of "badge-success", "badge-warning", or "badge-danger" corresponding to status
-            - skills: Top 4 technical skills found in resume
-            - experience: A one-sentence summary (e.g., "5 years - Senior Dev at Google")
-            
-            JSON only, no additional talk.
-            """
-            
-            response = model.generate_content(prompt)
-            data = _clean_json_response(response.text)
-            
-            if data:
-                parsed_results.append(data)
-            else:
-                # Fallback if AI fails to format JSON correctly
-                parsed_results.append({
-                    "name": file.filename,
-                    "score": 0,
-                    "status": "Error",
-                    "badgeClass": "badge-danger",
-                    "skills": [],
-                    "experience": "Could not parse analysis"
-                })
 
-        # 4. Sort by score descending
+            # ── Local ATS scoring — no Gemini ─────────────────────────────
+            try:
+                result = score_resume(extracted_text, job_description, filename=file.filename)
+            except Exception as score_err:
+                print(f"ATS scoring error for {file.filename}: {score_err}")
+                result = {
+                    "name":       file.filename,
+                    "score":      0,
+                    "status":     "Error",
+                    "badgeClass": "badge-danger",
+                    "skills":     [],
+                    "experience": "Could not parse resume",
+                    "category":   "OTHER",
+                    "score_breakdown": {},
+                    "matched_skills":  [],
+                    "key_gaps":        [],
+                }
+
+            parsed_results.append(result)
+
+            # Auto-save to Firestore
+            # ATS results returned in API response; saved to jobs/{job_id}/applications on candidate apply
+
         parsed_results.sort(key=lambda x: x.get('score', 0), reverse=True)
 
         return jsonify({
-            "status": "success",
+            "status":  "success",
             "message": f"Successfully analyzed {len(parsed_results)} resumes!",
-            "results": parsed_results
+            "results": parsed_results,
+            "engine":  "local_ats_v1",
         })
+
     except Exception as e:
         print(f"Error in analyze_resumes: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -290,8 +313,15 @@ def handle_profile():
             if not email:
                 return jsonify({"status": "error", "message": "Email is required"}), 400
             
-            # Simple profile update (merge data)
-            user_ref = db.collection('users').document(email)
+            # Determine which collection to update
+            index_doc = db.collection('user_index').document(email).get()
+            if not index_doc.exists:
+                return jsonify({"status": "error", "message": "User not found"}), 404
+                
+            user_role = index_doc.to_dict().get('role')
+            collection_name = 'recruiters' if user_role == 'recruiter' else 'candidates'
+            
+            user_ref = db.collection(collection_name).document(email)
             user_ref.update(data)
             
             # Get updated data
@@ -311,7 +341,15 @@ def handle_profile():
             if not email:
                 return jsonify({"status": "error", "message": "Email is required"}), 400
                 
-            user_doc = db.collection('users').document(email).get()
+            # Check user_index to get role
+            index_doc = db.collection('user_index').document(email).get()
+            if not index_doc.exists:
+                return jsonify({"status": "error", "message": "User not found"}), 404
+                
+            user_role = index_doc.to_dict().get('role')
+            collection_name = 'recruiters' if user_role == 'recruiter' else 'candidates'
+            user_doc = db.collection(collection_name).document(email).get()
+                
             if not user_doc.exists:
                 return jsonify({"status": "error", "message": "User not found"}), 404
                 
@@ -363,25 +401,161 @@ def upload_resume():
         encoded_string = base64.b64encode(file_bytes).decode('utf-8')
         resume_data_uri = f"data:application/pdf;base64,{encoded_string}"
 
-        # Update user profile in Firestore
-        user_ref = db.collection('users').document(email)
-        user_ref.update({
+        # --- Extract text and parse with Gemini ---
+        parsed_resume = None
+        try:
+            file_stream = io.BytesIO(file_bytes)
+            raw_text = extract_text(file_stream, file.filename)
+
+            model = get_model()
+            if model and raw_text:
+                prompt = f"""
+You are a resume parser. Extract all structured information from the resume text below.
+Respond STRICTLY with a single JSON object (no markdown fences, no extra text) with these fields:
+- name: string
+- email: string
+- phone: string
+- summary: string (professional summary or objective)
+- skills: array of strings
+- experience: array of objects with keys: title, company, duration, description
+- education: array of objects with keys: degree, institution, year
+- certifications: array of strings
+- languages: array of strings
+
+If a field is not found, use an empty string or empty array as appropriate.
+
+Resume Text:
+{raw_text}
+"""
+                response = model.generate_content(prompt)
+                parsed_resume = _clean_json_response(response.text)
+                print(f"✅ Resume parsed successfully for {email}")
+            else:
+                print("⚠️  Skipping Gemini parse: model not ready or no text extracted.")
+        except Exception as parse_err:
+            print(f"⚠️  Could not parse resume with Gemini: {parse_err}")
+            parsed_resume = None
+        # --- End parse ---
+
+        # Update candidate profile in Firestore (only candidates upload resumes here)
+        user_ref = db.collection('candidates').document(email)
+        
+        is_default = len(list(user_ref.collection('resumes').stream())) == 0
+        resume_id = str(datetime.datetime.utcnow().timestamp()).replace('.', '')
+        
+        new_resume = {
+            'id': resume_id,
             'resumeUrl': resume_data_uri,
             'resumeName': file.filename,
-            'updatedAt': firestore.SERVER_TIMESTAMP
-        })
+            'type': 'uploaded',
+            'parsedResume': parsed_resume,
+            'isDefault': is_default,
+            'uploadedAt': datetime.datetime.utcnow().isoformat()
+        }
+        
+        user_ref.collection('resumes').document(resume_id).set(new_resume)
+        
+        if is_default:
+            update_data = {
+                'defaultResumeId': resume_id,
+                'resumeUrl': resume_data_uri,
+                'resumeName': file.filename,
+                'updatedAt': firestore.SERVER_TIMESTAMP
+            }
+            if parsed_resume:
+                update_data['parsedResume'] = parsed_resume
+            user_ref.update(update_data)
 
         return jsonify({
             "status": "success",
             "message": "Resume saved successfully to profile!",
             "resumeUrl": resume_data_uri,
-            "resumeName": file.filename
+            "resumeName": file.filename,
+            "parsedResume": parsed_resume
         })
 
     except Exception as e:
         import traceback
         print(f"Error in upload_resume: {e}")
         traceback.print_exc()
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@api_bp.route('/api/profile/set-default-resume', methods=['POST'])
+def set_default_resume():
+    try:
+        db = get_db()
+        data = request.json
+        email = data.get('email')
+        resume_id = data.get('resume_id')
+        
+        if not email or not resume_id:
+            return jsonify({"status": "error", "message": "Email and resume_id are required"}), 400
+            
+        user_ref = db.collection('candidates').document(email)
+        doc = user_ref.get()
+        
+        if not doc.exists:
+            return jsonify({"status": "error", "message": "User not found"}), 404
+            
+        all_resumes = list(user_ref.collection('resumes').stream())
+        matched_resume = None
+        
+        for r_doc in all_resumes:
+            r_data = r_doc.to_dict()
+            is_match = (
+                str(r_doc.id) == str(resume_id) or
+                str(r_data.get('resume_id', '')) == str(resume_id) or
+                str(r_data.get('uploadedAt', '')) == str(resume_id)  # fallback
+            )
+            r_doc.reference.update({'isDefault': is_match})
+            if is_match:
+                matched_resume = r_data
+
+        if not matched_resume:
+            return jsonify({"status": "error", "message": "Resume not found in your profile"}), 404
+
+        assert matched_resume is not None  # type narrowing: already guarded above
+
+        update_data = {
+            'defaultResumeId': resume_id,
+            'resumeName': matched_resume.get('resumeName', 'Default Resume'),
+            'updatedAt': firestore.SERVER_TIMESTAMP
+        }
+
+        resume_url = matched_resume.get('resumeUrl')
+        if resume_url:
+            update_data['resumeUrl'] = resume_url
+
+        parsed = matched_resume.get('parsedResume')
+        if parsed:
+            update_data['parsedResume'] = parsed
+
+        user_ref.update(update_data)
+
+        return jsonify({"status": "success", "message": "Default resume updated successfully!"})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"Error in set_default_resume: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@api_bp.route('/api/profile/resumes', methods=['GET'])
+def get_resumes():
+    try:
+        db = get_db()
+        email = request.args.get('email')
+        if not email:
+            return jsonify({"status": "error", "message": "Email is required"}), 400
+        resumes_ref = db.collection('candidates').document(email).collection('resumes').stream()
+        resumes = []
+        for doc in resumes_ref:
+            r = doc.to_dict()
+            r['id'] = doc.id
+            resumes.append(r)
+        resumes.sort(key=lambda x: x.get('uploadedAt', ''), reverse=True)
+        return jsonify({"status": "success", "resumes": resumes})
+    except Exception as e:
+        print(f"Error in get_resumes: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @api_bp.route('/api/jobs', methods=['GET', 'POST'])
@@ -398,18 +572,28 @@ def handle_jobs():
             recruiter_email = data.get('recruiter_email')
             
             if not all([title, company, recruiter_email]):
-                return jsonify({"status": "error", "message": "Missing required job fields"}), 400
+                return jsonify({"status": "error", "message": "Missing required job fields: title, company, or recruiter_email"}), 400
             
             job_ref = db.collection('jobs').document()
             job_data = {
                 "id": job_ref.id,
                 "title": title,
                 "company": company,
+                "department": data.get('department', ''),
                 "location": data.get('location', 'Remote'),
-                "type": data.get('type', 'Full-time'), # Job or Internship
+                "workArrangement": data.get('workArrangement', 'Remote'),
+                "type": data.get('type', 'Full-time'),
+                "experienceLevel": data.get('experienceLevel', 'Mid-Level'),
                 "salary": data.get('salary', 'Competitive'),
-                "description": data.get('description', ''),
-                "requirements": data.get('requirements', []),
+                "companyOverview": data.get('companyOverview', ''),
+                "jobSummary": data.get('jobSummary', ''),
+                "keyResponsibilities": data.get('keyResponsibilities', ''),
+                "requiredSkills": data.get('requiredSkills', ''),
+                "softSkills": data.get('softSkills', ''),
+                "educationalBackground": data.get('educationalBackground', ''),
+                "preferredQualifications": data.get('preferredQualifications', ''),
+                "applicationDeadline": data.get('applicationDeadline', ''),
+                "requiredDocumentsList": data.get('requiredDocumentsList', []),
                 "recruiter_email": recruiter_email,
                 "posted_at": firestore.SERVER_TIMESTAMP
             }
@@ -419,8 +603,14 @@ def handle_jobs():
             response_data['posted_at'] = None # Or a placeholder string
             return jsonify({"status": "success", "message": "Job posted successfully!", "job": response_data})
         
-        else: # GET - Fetch all jobs
-            jobs_docs = db.collection('jobs').order_by('posted_at', direction=firestore.Query.DESCENDING).stream()
+        else: # GET - Fetch jobs
+            recruiter_email = request.args.get('recruiter_email')
+            if recruiter_email:
+                # Removed order_by here to avoid requiring a composite index in Firestore
+                jobs_docs = db.collection('jobs').where('recruiter_email', '==', recruiter_email).stream()
+            else:
+                jobs_docs = db.collection('jobs').order_by('posted_at', direction=firestore.Query.DESCENDING).stream()
+                
             jobs = []
             for doc in jobs_docs:
                 job = doc.to_dict()
@@ -428,40 +618,178 @@ def handle_jobs():
                 if 'posted_at' in job and job['posted_at']:
                     job['posted_at'] = job['posted_at'].isoformat()
                 jobs.append(job)
+                
+            # Sort manually if we didn't use Native Firestore sorting
+            if recruiter_email:
+                jobs.sort(key=lambda x: x.get('posted_at') or '', reverse=True)
+                
             return jsonify({"status": "success", "jobs": jobs})
 
     except Exception as e:
         print(f"Error in handle_jobs: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
+@api_bp.route('/api/jobs/<job_id>', methods=['PUT', 'DELETE', 'GET'])
+def handle_specific_job(job_id):
+    try:
+        db = get_db()
+        if not db:
+            return jsonify({"status": "error", "message": "Database not initialized"}), 500
+
+        job_ref = db.collection('jobs').document(job_id)
+        job_doc = job_ref.get()
+
+        if not job_doc.exists:
+            return jsonify({"status": "error", "message": "Job not found"}), 404
+
+        if request.method == 'GET':
+            job = job_doc.to_dict()
+            if 'posted_at' in job and job['posted_at']:
+                job['posted_at'] = job['posted_at'].isoformat()
+            return jsonify({"status": "success", "job": job})
+
+        if request.method == 'DELETE':
+            # Also optionally check if recruiter owns the job here
+            # recruiter_email = request.args.get('recruiter_email')
+            job_ref.delete()
+            return jsonify({"status": "success", "message": "Job deleted successfully"})
+
+        if request.method == 'PUT':
+            data = request.json
+            
+            # Fields that can be updated
+            update_data = {
+                "title": data.get('title'),
+                "company": data.get('company'),
+                "department": data.get('department'),
+                "location": data.get('location'),
+                "workArrangement": data.get('workArrangement'),
+                "type": data.get('type'),
+                "experienceLevel": data.get('experienceLevel'),
+                "salary": data.get('salary'),
+                "companyOverview": data.get('companyOverview'),
+                "jobSummary": data.get('jobSummary'),
+                "keyResponsibilities": data.get('keyResponsibilities'),
+                "requiredSkills": data.get('requiredSkills'),
+                "softSkills": data.get('softSkills'),
+                "educationalBackground": data.get('educationalBackground'),
+                "preferredQualifications": data.get('preferredQualifications'),
+                "applicationDeadline": data.get('applicationDeadline'),
+                "requiredDocumentsList": data.get('requiredDocumentsList'),
+            }
+            # Remove None values so we don't overwrite with nulls if a field is omitted
+            update_data = {k: v for k, v in update_data.items() if v is not None}
+            update_data['updated_at'] = firestore.SERVER_TIMESTAMP
+
+            job_ref.update(update_data)
+            return jsonify({"status": "success", "message": "Job updated successfully"})
+
+    except Exception as e:
+        print(f"Error in handle_specific_job: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@api_bp.route('/api/jobs/preview_score', methods=['POST'])
+def preview_score():
+    try:
+        db = get_db()
+        job_id = request.form.get('job_id')
+        resume_file = request.files.get('resume')
+        
+        if not all([job_id, resume_file]):
+            return jsonify({"status": "error", "message": "Missing job_id or resume file"}), 400
+            
+        job_doc = db.collection('jobs').document(job_id).get()
+        if not job_doc.exists:
+            return jsonify({"status": "error", "message": "Job not found"}), 404
+            
+        job_data = job_doc.to_dict()
+        jd_text = job_data.get('jobSummary') or job_data.get('description') or ""
+        
+        file_stream = io.BytesIO(resume_file.read())
+        extracted_resume_text = extract_text(file_stream, resume_file.filename)
+        
+        ats_result = score_resume(extracted_resume_text, jd_text, filename=resume_file.filename)
+        
+        return jsonify({
+            "status": "success",
+            "message": "Preview generated successfully!",
+            "ats_result": ats_result
+        })
+    except Exception as e:
+        print(f"Error previewing score: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 @api_bp.route('/api/jobs/apply', methods=['POST'])
 def apply_for_job():
     try:
         db = get_db()
-        data = request.json
-        job_id = data.get('job_id')
-        candidate_email = data.get('candidate_email')
         
-        if not all([job_id, candidate_email]):
-            return jsonify({"status": "error", "message": "Missing application fields"}), 400
+        # Now accepting multipart/form-data
+        job_id = request.form.get('job_id')
+        candidate_email = request.form.get('candidate_email')
+        resume_file = request.files.get('resume')
+        
+        if not all([job_id, candidate_email, resume_file]):
+            return jsonify({"status": "error", "message": "Missing application fields or resume file"}), 400
             
         # Check if already applied
-        existing = db.collection('job_applications').where('job_id', '==', job_id).where('candidate_email', '==', candidate_email).get()
+        existing = db.collection('jobs').document(job_id).collection('applications').where('candidate_email', '==', candidate_email).get()
         if len(existing) > 0:
             return jsonify({"status": "error", "message": "You have already applied for this job"}), 400
             
-        app_ref = db.collection('job_applications').document()
+        # ── 1. Fetch Job Description for Scoring ─────────────────────────
+        job_doc = db.collection('jobs').document(job_id).get()
+        if not job_doc.exists:
+            return jsonify({"status": "error", "message": "Job not found"}), 404
+            
+        job_data = job_doc.to_dict()
+        # Fallback to jobSummary or description fields as the JD text
+        jd_text = job_data.get('jobSummary') or job_data.get('description') or ""
+        
+        # ── 2. Parse Resume and Score ────────────────────────────────────
+        pre_ats_result_raw = request.form.get('ats_result')
+        if pre_ats_result_raw:
+            try:
+                ats_result = json.loads(pre_ats_result_raw)
+            except Exception as parse_e:
+                print(f"Error parsing precomputed ATS data: {parse_e}")
+                ats_result = None
+        else:
+            ats_result = None
+
+        if not ats_result:
+            file_stream = io.BytesIO(resume_file.read())
+            extracted_resume_text = extract_text(file_stream, resume_file.filename)
+            ats_result = score_resume(extracted_resume_text, jd_text, filename=resume_file.filename)
+            
+        # ── 3. Save Application with ATS Data ────────────────────────────
+        app_ref = db.collection('jobs').document(job_id).collection('applications').document()
         app_data = {
             "id": app_ref.id,
             "job_id": job_id,
             "candidate_email": candidate_email,
             "status": "Applied",
-            "applied_at": firestore.SERVER_TIMESTAMP
+            "applied_at": firestore.SERVER_TIMESTAMP,
+            # Attach the ATS insights
+            "ats_score": ats_result.get("score", 0),
+            "ats_badge": ats_result.get("badgeClass", "badge-warning"),
+            "score_breakdown": ats_result.get("score_breakdown", {}),
+            "matched_skills": ats_result.get("matched_skills", []),
+            "missing_skills": ats_result.get("key_gaps", []),
+            "resume_filename": resume_file.filename
         }
         app_ref.set(app_data)
-        return jsonify({"status": "success", "message": "Applied successfully!"})
+        
+        return jsonify({
+            "status": "success", 
+            "message": "Applied successfully!",
+            "ats_score": app_data["ats_score"]
+        })
 
     except Exception as e:
+        print(f"Error applying for job: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @api_bp.route('/api/recruiter/applications', methods=['GET'])
@@ -484,13 +812,13 @@ def get_recruiter_applications():
         # Here we loop through job_ids since it's likely small for a MVP
         all_apps = []
         for j_id in job_ids:
-            apps = db.collection('job_applications').where('job_id', '==', j_id).get()
+            apps = db.collection('jobs').document(j_id).collection('applications').stream()
             for app_doc in apps:
                 app_data = app_doc.to_dict()
                 
                 # Fetch candidate profile to get name and resume
                 c_email = app_data.get('candidate_email')
-                user_doc = db.collection('users').document(c_email).get()
+                user_doc = db.collection('candidates').document(c_email).get()
                 if user_doc.exists:
                     user_data = user_doc.to_dict()
                     app_data['candidate_name'] = user_data.get('name', 'Unknown')
@@ -517,7 +845,7 @@ def check_db():
     try:
         db = get_db()
         if not db:
-             return jsonify({"status": "error", "message": "Firebase not initialized. Did you add serviceAccountKey.json?"})
+            return jsonify({"status": "error", "message": "Firebase not initialized. Did you add serviceAccountKey.json?"})
         # Simple test to see if we can talk to Firestore
         return jsonify({"status": "success", "message": "Connected to Firestore!"})
     except Exception as e:
