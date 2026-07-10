@@ -26,3 +26,6 @@ Thumbs.db
 
 # Graphify output directory
 graphify-out/
+
+# Test scripts
+test_scripts/
