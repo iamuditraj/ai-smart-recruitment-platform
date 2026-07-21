@@ -1,10 +1,8 @@
-import axios from 'axios'
 import { reactive, ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { mapToStructuredResume } from '../utils/resumeMapper.js'
 import { validateStructuredResume } from '../utils/resumeValidator.js'
-
-const API_BASE = 'http://localhost:5001/api'
+import { saveResume as saveResumeApi, generateContent } from '../utils/api.js'
 
 export const useResumeStore = defineStore('resume', () => {
     // --- Selected Template ---
@@ -130,8 +128,8 @@ export const useResumeStore = defineStore('resume', () => {
         isSaving.value = true
         try {
             const snapshot = saveSnapshot()
-            const response = await axios.post(`${API_BASE}/save-resume`, snapshot)
-            return response.data
+            const data = await saveResumeApi(snapshot)
+            return data
         } finally {
             isSaving.value = false
         }
@@ -140,8 +138,8 @@ export const useResumeStore = defineStore('resume', () => {
     async function generateAIContent(prompt, context = '') {
         isGenerating.value = true
         try {
-            const response = await axios.post(`${API_BASE}/generate-content`, { prompt, context })
-            return response.data.content
+            const data = await generateContent(prompt, context)
+            return data.content
         } finally {
             isGenerating.value = false
         }

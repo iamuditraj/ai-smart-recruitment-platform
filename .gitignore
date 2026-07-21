@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 venv/
+.venv/
+ml_model/.venv/
+ml_model/datasets/
 .env
 
 # Firebase
@@ -20,3 +23,6 @@ dist-ssr/
 # OS
 .DS_Store
 Thumbs.db
+
+# Graphify output directory
+graphify-out/

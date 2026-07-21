@@ -1,146 +1,129 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001'
+import { loginUser, signupUser, updateProfile as updateProfileApi, getProfile } from '../utils/api'
+import { useResumeActions } from '../composables/useResumeActions'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(JSON.parse(localStorage.getItem('auth_user') || 'null'))
-  const role = ref(localStorage.getItem('user_role') || null)
+  const resumes = ref([])
+
+  // Derive role directly from user object so it is always in sync.
+  // Falls back to localStorage so the sidebar renders correctly on first load.
+  const role = computed(() => user.value?.role || localStorage.getItem('user_role') || null)
 
   const isAuthenticated = computed(() => !!user.value)
   const isRecruiter = computed(() => role.value === 'recruiter')
   const isCandidate = computed(() => role.value === 'candidate')
 
+  const handleApiError = (context, error) => {
+    console.error(`${context} error:`, error)
+    return { success: false, message: error.message || 'Server connection failed' }
+  }
+
   async function login(email, password) {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      })
-      const data = await response.json()
-
-      if (data.status === 'success') {
-        user.value = data.user
-        role.value = data.user.role
-        localStorage.setItem('auth_user', JSON.stringify(data.user))
-        localStorage.setItem('user_role', data.user.role)
-        return { success: true }
-      } else {
-        return { success: false, message: data.message }
-      }
+      const data = await loginUser(email, password)
+      user.value = data.user
+      localStorage.setItem('auth_user', JSON.stringify(data.user))
+      localStorage.setItem('user_role', data.user.role)
+      return { success: true }
     } catch (error) {
-      console.error('Login error:', error)
-      return { success: false, message: 'Server connection failed' }
+      return handleApiError('Login', error)
     }
   }
 
   async function signup(userData) {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/signup`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(userData)
-      })
-      const data = await response.json()
-
-      if (data.status === 'success') {
-        // Auto login after signup
-        user.value = data.user
-        role.value = data.user.role
-        localStorage.setItem('auth_user', JSON.stringify(data.user))
-        localStorage.setItem('user_role', data.user.role)
-        return { success: true }
-      } else {
-        return { success: false, message: data.message }
-      }
+      const data = await signupUser(userData)
+      user.value = data.user
+      localStorage.setItem('auth_user', JSON.stringify(data.user))
+      localStorage.setItem('user_role', data.user.role)
+      return { success: true }
     } catch (error) {
-      console.error('Signup error:', error)
-      return { success: false, message: 'Server connection failed' }
+      return handleApiError('Signup', error)
+    }
+  }
+
+  async function loginWithGoogle(role = null) {
+    try {
+      const { signInWithPopup } = await import('firebase/auth')
+      const { auth, googleProvider } = await import('../utils/firebase')
+      
+      const result = await signInWithPopup(auth, googleProvider)
+      const idToken = await result.user.getIdToken()
+      
+      // We import googleAuth from api here since it acts nicely alongside the others
+      const { googleAuth } = await import('../utils/api')
+      const data = await googleAuth(idToken, role)
+      
+      user.value = data.user
+      localStorage.setItem('auth_user', JSON.stringify(data.user))
+      localStorage.setItem('user_role', data.user.role)
+      return { success: true }
+    } catch (error) {
+      if (error.code === 'auth/popup-closed-by-user') {
+         return { success: false, message: 'Google sign in was cancelled' };
+      }
+      const isNotFound = error.message === 'Account not found. Please sign up.';
+      return { 
+        success: false, 
+        message: error.message || 'Google Auth failed', 
+        code: isNotFound ? 'USER_NOT_FOUND' : undefined 
+      };
     }
   }
 
   async function updateProfile(profileData) {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/profile`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...profileData, email: user.value.email })
-      })
-      const data = await response.json()
-
-      if (data.status === 'success') {
-        user.value = data.user
-        localStorage.setItem('auth_user', JSON.stringify(data.user))
-        return { success: true }
-      } else {
-        return { success: false, message: data.message }
-      }
+      const data = await updateProfileApi({ ...profileData, email: user.value.email })
+      user.value = data.user
+      localStorage.setItem('auth_user', JSON.stringify(data.user))
+      return { success: true }
     } catch (error) {
-      console.error('Profile update error:', error)
-      return { success: false, message: 'Server connection failed' }
+      return handleApiError('Profile update', error)
     }
   }
 
   async function refreshUser() {
     if (!user.value?.email) return
     try {
-      const response = await fetch(`${API_BASE_URL}/api/profile?email=${user.value.email}`)
-      const data = await response.json()
-      if (data.status === 'success') {
-        user.value = data.user
-        localStorage.setItem('auth_user', JSON.stringify(data.user))
+      const data = await getProfile(user.value.email)
+      user.value = data.user
+      localStorage.setItem('auth_user', JSON.stringify(data.user))
+      // Keep user_role in sync so role computed stays correct even before vue reactivity settles
+      if (data.user.role) {
+        localStorage.setItem('user_role', data.user.role)
       }
     } catch (error) {
       console.error('Refresh user error:', error)
     }
-  }
-
-  async function uploadResume(file) {
-    if (!user.value?.email) return { success: false, message: 'Not logged in' }
-
-    try {
-      const formData = new FormData()
-      formData.append('resume', file)
-      formData.append('email', user.value.email)
-
-      const response = await fetch(`${API_BASE_URL}/api/profile/upload-resume`, {
-        method: 'POST',
-        body: formData
-      })
-      const data = await response.json()
-
-      if (data.status === 'success') {
-        // Refresh user data to get the new resume URL
-        await refreshUser()
-        return { success: true, url: data.resumeUrl, name: data.resumeName }
-      } else {
-        return { success: false, message: data.message }
-      }
-    } catch (error) {
-      console.error('Resume upload error:', error)
-      return { success: false, message: 'Server connection failed' }
-    }
+    await resumeActions.fetchResumes()
   }
 
   function logout() {
     user.value = null
-    role.value = null
     localStorage.removeItem('auth_user')
     localStorage.removeItem('user_role')
   }
 
+  const storeInstance = { user, resumes, refreshUser }
+  const resumeActions = useResumeActions(storeInstance)
+
   return {
     user,
     role,
+    resumes,
     isAuthenticated,
     isRecruiter,
     isCandidate,
     login,
     signup,
+    loginWithGoogle,
     updateProfile,
-    uploadResume,
+    uploadResume: resumeActions.uploadResume,
+    setDefaultResume: resumeActions.setDefaultResume,
     refreshUser,
+    fetchResumes: resumeActions.fetchResumes,
     logout
   }
 })

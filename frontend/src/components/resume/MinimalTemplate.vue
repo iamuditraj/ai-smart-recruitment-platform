@@ -119,7 +119,6 @@ const d = computed(() => props.data)
   font-family: 'Georgia', 'Times New Roman', serif;
   background: #ffffff;
   color: #111827;
-  min-height: 1056px;
   font-size: 11.5px;
   line-height: 1.6;
   padding: 48px 52px;

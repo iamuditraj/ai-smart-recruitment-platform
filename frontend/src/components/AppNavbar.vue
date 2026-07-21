@@ -1,8 +1,20 @@
 <template>
-  <aside class="sidebar" :class="{ 'sidebar--collapsed': uiStore.isSidebarCollapsed }">
+  <div
+    class="sidebar-overlay"
+    :class="{ 'sidebar-overlay--open': isOpen }"
+    @click="$emit('close')"
+  ></div>
+
+  <aside
+    class="sidebar"
+    :class="{
+      'sidebar--collapsed': uiStore.isSidebarCollapsed,
+      'sidebar--open': isOpen
+    }"
+  >
     <!-- Sidebar Header -->
-    <div class="sidebar__header" @click="uiStore.toggleSidebar" style="cursor: pointer;">
-      <div v-if="!uiStore.isSidebarCollapsed" class="sidebar__brand">
+    <div class="sidebar__header">
+      <div v-if="!uiStore.isSidebarCollapsed || isOpen" class="sidebar__brand">
         <div class="brand-logo">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
@@ -10,7 +22,7 @@
             <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
           </svg>
         </div>
-        <span class="brand-text">Hire<span class="brand-text--accent">AI</span></span>
+        <span class="brand-text">hire<span class="brand-text--accent">AI</span></span>
       </div>
       <div v-else class="brand-logo">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -19,12 +31,16 @@
           <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
         </svg>
       </div>
+
+      <button class="icon-btn hide-desktop mobile-close-btn" @click="$emit('close')">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
     </div>
 
     <!-- Navigation -->
     <div class="sidebar__content">
       <div v-for="group in filteredGroups" :key="group.name" class="sidebar__group">
-        <h3 v-if="group.name && !uiStore.isSidebarCollapsed" class="group-title">{{ group.name }}</h3>
+        <h3 v-if="group.name && (!uiStore.isSidebarCollapsed || isOpen)" class="group-title">{{ group.name }}</h3>
         <div class="group-links">
           <RouterLink
             v-for="link in group.links"
@@ -32,10 +48,10 @@
             :to="link.to"
             class="nav-item"
             active-class="nav-item--active"
-            :title="uiStore.isSidebarCollapsed ? link.name : ''"
+            :title="uiStore.isSidebarCollapsed && !isOpen ? link.name : ''"
           >
             <span class="nav-icon" v-html="link.icon"></span>
-            <span class="nav-text" v-if="!uiStore.isSidebarCollapsed">{{ link.name }}</span>
+            <span class="nav-text" v-if="!uiStore.isSidebarCollapsed || isOpen">{{ link.name }}</span>
           </RouterLink>
         </div>
       </div>
@@ -48,15 +64,18 @@
           <img v-if="authStore.user?.photo" :src="authStore.user.photo" alt="Avatar" class="avatar-img">
           <span v-else>{{ authStore.user?.name?.charAt(0).toUpperCase() }}</span>
         </div>
-        <div class="user-info" v-if="!uiStore.isSidebarCollapsed">
+        <!-- Show user info when sidebar is expanded OR when mobile drawer is open -->
+        <div class="user-info" v-if="!uiStore.isSidebarCollapsed || isOpen">
           <span class="user-name">{{ authStore.user?.name }}</span>
           <span class="user-role">{{ authStore.role }}</span>
         </div>
-        <button v-if="!uiStore.isSidebarCollapsed" @click="handleLogout" class="logout-btn" title="Sign Out">
+        <!-- Always show logout when expanded or mobile drawer open -->
+        <button v-if="!uiStore.isSidebarCollapsed || isOpen" @click="handleLogout" class="logout-btn" title="Sign Out">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
         </button>
       </div>
-      <button v-if="uiStore.isSidebarCollapsed" @click="handleLogout" class="nav-item signout-btn-collapsed" title="Logout">
+      <!-- Collapsed desktop-only logout icon -->
+      <button v-if="uiStore.isSidebarCollapsed && !isOpen" @click="handleLogout" class="nav-item signout-btn-collapsed" title="Logout">
         <span class="nav-icon">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
         </span>
@@ -70,6 +89,15 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useUIStore } from '../stores/ui'
+
+const props = defineProps({
+  isOpen: {
+    type: Boolean,
+    default: false
+  }
+})
+
+defineEmits(['close'])
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -103,10 +131,22 @@ const sidebarGroups = [
         icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>`,
       },
       {
+        name: 'My Applications',
+        to: '/my-applications',
+        roles: ['candidate'],
+        icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="M9 14l2 2 4-4"/></svg>`,
+      },
+      {
         name: 'Resume Builder',
         to: '/resume-generation',
         roles: ['candidate'],
         icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>`,
+      },
+      {
+        name: 'Resume Hub',
+        to: '/resume-hub',
+        roles: ['candidate'],
+        icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`,
       },
       {
         name: 'Skill Assessment',
@@ -132,10 +172,10 @@ const sidebarGroups = [
         icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>`,
       },
       {
-        name: 'Candidate Ranking',
-        to: '/candidate-ranking',
+        name: 'ATS Scanner',
+        to: '/resume-screening',
         roles: ['recruiter'],
-        icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="12" y2="17"/></svg>`,
+        icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`,
       },
     ]
   }
@@ -167,10 +207,62 @@ function handleLogout() {
   flex-direction: column;
   position: sticky;
   top: 0;
-  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
   flex-shrink: 0;
-  z-index: 1000;
+  z-index: 1100;
   box-shadow: 4px 0 24px rgba(0, 0, 0, 0.02);
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 280px !important; /* override collapsed state on mobile */
+    transform: translateX(-100%);
+  }
+
+  .sidebar--open {
+    transform: translateX(0);
+  }
+
+  /* When drawer is open, always show full expanded layout, ignore collapsed CSS */
+  .sidebar--open.sidebar--collapsed .nav-item {
+    justify-content: flex-start;
+    padding: 0.75rem 1rem;
+  }
+
+  .sidebar--open.sidebar--collapsed .sidebar__user {
+    justify-content: flex-start;
+    padding: 0.5rem;
+  }
+
+  .sidebar--open.sidebar--collapsed .sidebar__header {
+    justify-content: space-between;
+    padding: 0 1.5rem;
+  }
+}
+
+.sidebar-overlay {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 1099;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.28s ease;
+  }
+
+  .sidebar-overlay--open {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 
 .sidebar--collapsed {
@@ -182,13 +274,20 @@ function handleLogout() {
   padding: 0 1.5rem;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: space-between;
   border-bottom: 1px solid var(--clr-border);
 }
 
 .sidebar--collapsed .sidebar__header {
   justify-content: center;
   padding: 0;
+}
+
+@media (max-width: 768px) {
+  .sidebar--collapsed .sidebar__header {
+    justify-content: space-between;
+    padding: 0 1.5rem;
+  }
 }
 
 .sidebar__brand {
@@ -219,6 +318,10 @@ function handleLogout() {
 
 .brand-text--accent {
   color: var(--clr-primary);
+}
+
+.mobile-close-btn {
+  color: var(--clr-text-muted);
 }
 
 .sidebar__content {
@@ -365,7 +468,7 @@ function handleLogout() {
 .logout-btn:hover {
   background: var(--clr-danger);
   color: white;
-  opacity: 0.1; /* This was meant to be background opacity but it affects content, will fix to rgba in real css if needed but here keeping simplicity */
+  opacity: 0.1;
   background: rgba(239, 68, 68, 0.1);
   color: #ef4444;
 }

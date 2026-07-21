@@ -1,10 +1,17 @@
 <template>
   <div id="app-root" :class="{ 'has-sidebar': authStore.isAuthenticated, 'sidebar-collapsed': uiStore.isSidebarCollapsed }">
-    <AppNavbar v-if="authStore.isAuthenticated" />
+    <AppNavbar
+      v-if="authStore.isAuthenticated"
+      :isOpen="sidebarOpen"
+      @close="sidebarOpen = false"
+    />
 
     <div class="main-wrapper">
       <header v-if="authStore.isAuthenticated" class="app-header">
         <div class="header-left">
+          <button class="icon-btn hide-desktop" @click="sidebarOpen = true">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+          </button>
           <h1 class="page-title">{{ currentPageTitle }}</h1>
         </div>
 
@@ -37,7 +44,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import AppNavbar from './components/AppNavbar.vue'
 import { useAuthStore } from './stores/auth'
@@ -47,7 +54,19 @@ const authStore = useAuthStore()
 const uiStore = useUIStore()
 const route = useRoute()
 
+const sidebarOpen = ref(false)
+
+// Close sidebar on route change
+watch(route, () => {
+  sidebarOpen.value = false
+})
+
 const currentPageTitle = computed(() => {
+  // Prefer the human-readable meta.title, strip the " — HireAI" suffix
+  if (route.meta?.title) {
+    return route.meta.title.replace(/\s*—.*$/, '')
+  }
+  // Fall back to transforming the route name
   const name = route.name || 'Dashboard'
   return name.toString()
     .split('-')
@@ -85,10 +104,22 @@ const currentPageTitle = computed(() => {
   z-index: 900;
 }
 
+@media (max-width: 768px) {
+  .app-header {
+    padding: 0 1rem;
+  }
+}
+
 .header-left {
   display: flex;
   align-items: center;
   gap: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  .header-left {
+    gap: 0.75rem;
+  }
 }
 
 .header-toggle-btn {
@@ -115,10 +146,22 @@ const currentPageTitle = computed(() => {
   text-transform: capitalize;
 }
 
+@media (max-width: 480px) {
+  .page-title {
+    font-size: 1.1rem;
+  }
+}
+
 .header-right {
   display: flex;
   align-items: center;
   gap: 2rem;
+}
+
+@media (max-width: 1024px) {
+  .header-right {
+    gap: 1rem;
+  }
 }
 
 .search-bar {
@@ -130,6 +173,12 @@ const currentPageTitle = computed(() => {
   border-radius: 10px;
   width: 300px;
   color: var(--clr-text-muted);
+}
+
+@media (max-width: 768px) {
+  .search-bar {
+    display: none;
+  }
 }
 
 .search-bar input {
@@ -168,8 +217,9 @@ const currentPageTitle = computed(() => {
 
 .main-content {
   flex: 1;
-  padding: 2rem;
+  padding: 0;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 #app-root:not(.has-sidebar) {

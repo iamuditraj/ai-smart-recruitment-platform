@@ -1,0 +1,147 @@
+<template>
+  <AuthLayout title="Create Account" subtitle="Join HireAI to start your journey">
+
+        <AuthForm 
+          @submit="handleSignup" 
+          :loading="isLoading" 
+          :error="errorMessage" 
+          submitText="Create Free Account"
+        >
+
+          <div class="form-group">
+            <label class="form-label">I am a...</label>
+            <div class="role-tabs">
+              <button
+                type="button"
+                @click="role = 'candidate'"
+                class="role-tab"
+                :class="{ active: role === 'candidate' }"
+              >
+                Candidate
+              </button>
+              <button
+                type="button"
+                @click="role = 'recruiter'"
+                class="role-tab"
+                :class="{ active: role === 'recruiter' }"
+              >
+                Recruiter
+              </button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="signup-name">Full Name</label>
+            <input
+              v-model="name"
+              type="text"
+              id="signup-name"
+              class="form-input"
+              placeholder="Your Name"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="signup-email">Email Address</label>
+            <input
+              v-model="email"
+              type="email"
+              id="signup-email"
+              class="form-input"
+              placeholder="name@example.com"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="signup-password">Password</label>
+            <input
+              v-model="password"
+              type="password"
+              id="signup-password"
+              class="form-input"
+              placeholder="Min. 8 characters"
+              required
+              minlength="8"
+            />
+          </div>
+
+        </AuthForm>
+
+        <div class="divider">
+          <span>OR</span>
+        </div>
+
+        <GoogleAuthButton :role="role" @error="errorMessage = $event" />
+
+        <template #footer>
+          <p class="text-sm text-muted">Already have an account? <RouterLink to="/login" class="gradient-text font-bold">Sign in</RouterLink></p>
+        </template>
+  </AuthLayout>
+</template>
+
+<script setup>
+import { ref, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { useAuthStore } from '../../stores/auth'
+import AuthLayout from '@/components/AuthLayout.vue'
+import AuthForm from '@/components/AuthForm.vue'
+import GoogleAuthButton from '@/components/GoogleAuthButton.vue'
+
+const router = useRouter()
+const route = useRoute()
+const authStore = useAuthStore()
+
+const role = ref('candidate')
+const name = ref('')
+const email = ref('')
+const password = ref('')
+const isLoading = ref(false)
+const errorMessage = ref('')
+
+watch(() => route.query.noAccount, (val) => {
+  if (val) {
+    errorMessage.value = 'Google account not found. Please create one to continue.'
+  }
+}, { immediate: true })
+
+async function handleSignup() {
+  isLoading.value = true
+  errorMessage.value = ''
+
+  const result = await authStore.signup({
+    email: email.value,
+    password: password.value,
+    role: role.value,
+    name: name.value
+  })
+
+  isLoading.value = false
+  if (result.success) {
+    router.push('/dashboard')
+  } else {
+    errorMessage.value = result.message || 'Signup failed'
+  }
+}
+</script>
+
+<style scoped>
+.divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 1.5rem 0 0.5rem;
+  color: var(--clr-text-muted);
+  font-size: 0.875rem;
+}
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid var(--clr-border);
+}
+.divider span {
+  padding: 0 10px;
+}
+</style>
